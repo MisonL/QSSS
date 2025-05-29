@@ -26,8 +26,6 @@ interface StockData {
   turn?: number | null;
   volatility?: number | null;
   macd?: number | null;
-  // The [key: string]: any; is generally discouraged if specific keys are known.
-  // We'll rely on the specific optional properties above.
 }
 
 export default function Home() {
@@ -42,18 +40,18 @@ export default function Home() {
       try {
         const response = await fetch('/api/run-strategy');
         if (response.ok) {
-          const result = await response.json();
-          const result = await response.json();
-          // Type assertion for the result
+          const result = await response.json(); // Single declaration
           if (Array.isArray(result) && result.every(item => typeof item === 'object' && item !== null)) {
             setData(result as StockData[]);
           } else if (typeof result === 'object' && result !== null && (result as any).error) {
-            // Handle cases where the API itself returns an error JSON
             const apiError = result as { error: string; details?: string };
             setError(apiError.error + (apiError.details ? `: ${apiError.details}` : ''));
             setData([]); 
+          } else if (typeof result === 'object' && result !== null && Object.keys(result).length === 0) {
+            setData([]); 
+            console.log("API returned an empty object, treating as no data.");
           } else {
-            console.error('Fetched data is not an array of objects:', result);
+            console.error('Fetched data is not an array of objects, nor a recognized error object:', result);
             setError('Received unexpected data format from API.');
             setData([]); 
           }
@@ -63,13 +61,12 @@ export default function Home() {
             const errData = await response.json();
             errorDetails = (errData as any).error || (errData as any).details || JSON.stringify(errData);
           } catch {
-            // If parsing error JSON fails, use status text or generic message
             errorDetails = response.statusText || 'Server returned an error.';
           }
           setError(`Failed to fetch data. ${errorDetails}`);
           setData([]); 
         }
-      } catch (e: unknown) { // Changed from e: any to e: unknown
+      } catch (e: unknown) {
         console.error('Fetch error:', e);
         if (e instanceof Error) {
           setError(e.message);
@@ -100,7 +97,6 @@ export default function Home() {
     { key: 'net_profit_margin', label: '销售净利率(年) (%)'}
   ];
 
-  // Type for value in formatValue
   type StockValue = string | number | null | undefined;
 
   const formatValue = (value: StockValue, key: string) => {
@@ -108,16 +104,14 @@ export default function Home() {
       return 'N/A';
     }
     if (typeof value === 'number') {
-      // Keys that should be displayed as percentages
       const percentageKeys = ['prediction', 'roe', 'debt_to_asset_ratio', 'gross_profit_margin', 'net_profit_margin'];
       if (percentageKeys.includes(key)) {
         return (value * 100).toFixed(2) + '%';
       }
-      return value.toFixed(2); // Default to 2 decimal places for other numbers
+      return value.toFixed(2);
     }
     return String(value);
   };
-
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
