@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
-import path from 'path'; // path import is present, but __dirname might not be ideal.
+// import path from 'path'; // Removed as per ESLint fix
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: Request) { // Renamed request to _request
   // Construct the path to app.py relative to the current file
   // Current file: webapp/src/app/api/run-strategy/route.ts

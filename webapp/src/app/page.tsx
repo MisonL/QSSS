@@ -28,6 +28,12 @@ interface StockData {
   macd?: number | null;
 }
 
+// Interface for API errors
+interface ApiError {
+  error: string;
+  details?: string;
+}
+
 export default function Home() {
   const [data, setData] = useState<StockData[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -43,8 +49,8 @@ export default function Home() {
           const result = await response.json(); // Single declaration
           if (Array.isArray(result) && result.every(item => typeof item === 'object' && item !== null)) {
             setData(result as StockData[]);
-          } else if (typeof result === 'object' && result !== null && (result as any).error) {
-            const apiError = result as { error: string; details?: string };
+          } else if (typeof result === 'object' && result !== null && 'error' in result) { // ESLint fix applied here
+            const apiError = result as ApiError; // Use ApiError interface
             setError(apiError.error + (apiError.details ? `: ${apiError.details}` : ''));
             setData([]); 
           } else if (typeof result === 'object' && result !== null && Object.keys(result).length === 0) {
@@ -59,7 +65,14 @@ export default function Home() {
           let errorDetails = `Status: ${response.status}`;
           try {
             const errData = await response.json();
-            errorDetails = (errData as any).error || (errData as any).details || JSON.stringify(errData);
+            // ESLint fix applied here:
+            if (typeof errData === 'object' && errData !== null && ('error' in errData || 'details' in errData)) {
+                const apiErr = errData as ApiError; // Type assertion after check
+                errorDetails = apiErr.error || apiErr.details || JSON.stringify(errData);
+            } else {
+                // If not the expected error structure, stringify the whole thing
+                errorDetails = JSON.stringify(errData);
+            }
           } catch {
             errorDetails = response.statusText || 'Server returned an error.';
           }
@@ -80,7 +93,7 @@ export default function Home() {
     }
 
     fetchData();
-  }, []); // Empty dependency array means this effect runs once on mount
+  }, []);
 
   const displayColumns = [
     { key: 'name', label: '股票名称' },
