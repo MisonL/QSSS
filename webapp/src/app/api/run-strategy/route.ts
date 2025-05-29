@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { spawn } from 'child_process';
-import path from 'path';
+import path from 'path'; // path import is present, but __dirname might not be ideal.
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) { // Renamed request to _request
   // Construct the path to app.py relative to the current file
   // Current file: webapp/src/app/api/run-strategy/route.ts
   // Target file: app.py (at the root of the repository)
   // Path: ../../../../app.py
-  const scriptPath = path.join(__dirname, '../../../../../app.py');
+  // const scriptPath = path.join(__dirname, '../../../../../app.py'); // Unused, __dirname behavior varies.
   // Note: In Next.js deployed environments, __dirname might behave differently.
   // For local dev, it's usually fine. A more robust way in Next.js might be:
   // const scriptPath = path.resolve(process.cwd(), '../../app.py'); if API route is in /app
@@ -15,12 +15,13 @@ export async function GET(request: Request) {
   // const scriptPath = path.resolve(process.cwd(), '../app.py'); 
   // For this specific structure, assuming CWD is /app (repo root) for the spawn, or use absolute path.
   // Let's assume the execution context of spawn will be the repo root or adjust scriptPath.
-  // Safest in this sandbox might be to use an absolute path from /app/
-  const absoluteScriptPath = '/app/app.py';
+  
+  // Safest in this sandbox/Docker might be to use an absolute path from /app/
+  const scriptToExecute = '/app/app.py'; // Using this as the definitive path
 
 
   return new Promise((resolve) => {
-    const pythonProcess = spawn('python3', [absoluteScriptPath, '--json-output']);
+    const pythonProcess = spawn('python3', [scriptToExecute, '--json-output']); // Used scriptToExecute
     
     let stdout_data = '';
     let stderr_data = '';

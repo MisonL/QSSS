@@ -4,17 +4,30 @@ import { useState, useEffect } from 'react';
 
 // Define an interface for the expected stock data structure
 interface StockData {
-  // Using English keys as they are likely from the DataFrame before mapping in app.py for JSON
-  // These should match the keys in the JSON output from the API
-  name: string; // 股票名称
-  symbol: string; // 股票代码
-  prediction: number; // 上涨概率
-  pe?: number | null; // 市盈率(PE) - Optional and can be null
-  roe?: number | null; // 净资产收益率(ROE) - Optional and can be null
-  momentum_score?: number | null; // 动量得分
-  explosion_score?: number | null; // 爆发潜力值
-  // Add other relevant fields as needed
-  [key: string]: any; // Allow other properties
+  name: string;
+  symbol: string;
+  prediction: number;
+  market?: string;
+  momentum_score?: number | null;
+  rsi?: number | null;
+  close?: number | null;
+  ma15?: number | null;
+  explosion_score?: number | null;
+  macd_status?: string | null;
+  pe?: number | null;
+  pb?: number | null;
+  roe?: number | null;
+  debt_to_asset_ratio?: number | null;
+  eps?: number | null;
+  bvps?: number | null;
+  gross_profit_margin?: number | null;
+  net_profit_margin?: number | null;
+  volume?: number | null;
+  turn?: number | null;
+  volatility?: number | null;
+  macd?: number | null;
+  // The [key: string]: any; is generally discouraged if specific keys are known.
+  // We'll rely on the specific optional properties above.
 }
 
 export default function Home() {
@@ -30,28 +43,40 @@ export default function Home() {
         const response = await fetch('/api/run-strategy');
         if (response.ok) {
           const result = await response.json();
-          if (Array.isArray(result)) {
-            setData(result);
-          } else if (typeof result === 'object' && result !== null && result.error) {
+          const result = await response.json();
+          // Type assertion for the result
+          if (Array.isArray(result) && result.every(item => typeof item === 'object' && item !== null)) {
+            setData(result as StockData[]);
+          } else if (typeof result === 'object' && result !== null && (result as any).error) {
             // Handle cases where the API itself returns an error JSON
-            setError(result.error + (result.details ? `: ${result.details}` : ''));
-            setData([]); // Clear data
-          } 
-          else {
-            // If the result is not an array (e.g. a single object, or unexpected format)
-            console.error('Fetched data is not an array:', result);
+            const apiError = result as { error: string; details?: string };
+            setError(apiError.error + (apiError.details ? `: ${apiError.details}` : ''));
+            setData([]); 
+          } else {
+            console.error('Fetched data is not an array of objects:', result);
             setError('Received unexpected data format from API.');
-            setData([]); // Clear data
+            setData([]); 
           }
         } else {
-          const errData = await response.json().catch(() => ({ error: 'Failed to fetch data. Server returned an error.' }));
-          setError(errData.error || `Failed to fetch data. Status: ${response.status}`);
-          setData([]); // Clear data
+          let errorDetails = `Status: ${response.status}`;
+          try {
+            const errData = await response.json();
+            errorDetails = (errData as any).error || (errData as any).details || JSON.stringify(errData);
+          } catch {
+            // If parsing error JSON fails, use status text or generic message
+            errorDetails = response.statusText || 'Server returned an error.';
+          }
+          setError(`Failed to fetch data. ${errorDetails}`);
+          setData([]); 
         }
-      } catch (e: any) {
+      } catch (e: unknown) { // Changed from e: any to e: unknown
         console.error('Fetch error:', e);
-        setError(e.message || 'An unexpected error occurred.');
-        setData([]); // Clear data
+        if (e instanceof Error) {
+          setError(e.message);
+        } else {
+          setError('An unexpected error occurred during fetch.');
+        }
+        setData([]); 
       } finally {
         setLoading(false);
       }
@@ -68,17 +93,27 @@ export default function Home() {
     { key: 'roe', label: '净资产收益率(ROE) (%)' },
     { key: 'momentum_score', label: '动量得分' },
     { key: 'explosion_score', label: '爆发潜力值' },
+    { key: 'debt_to_asset_ratio', label: '资产负债率 (%)' },
+    { key: 'eps', label: '每股收益(年)'},
+    { key: 'bvps', label: '每股净资产(年)'},
+    { key: 'gross_profit_margin', label: '销售毛利率(年) (%)'},
+    { key: 'net_profit_margin', label: '销售净利率(年) (%)'}
   ];
 
-  const formatValue = (value: any, key: string) => {
+  // Type for value in formatValue
+  type StockValue = string | number | null | undefined;
+
+  const formatValue = (value: StockValue, key: string) => {
     if (value === null || typeof value === 'undefined' || (typeof value === 'number' && isNaN(value))) {
       return 'N/A';
     }
     if (typeof value === 'number') {
-      if (key === 'prediction' || key === 'roe') {
+      // Keys that should be displayed as percentages
+      const percentageKeys = ['prediction', 'roe', 'debt_to_asset_ratio', 'gross_profit_margin', 'net_profit_margin'];
+      if (percentageKeys.includes(key)) {
         return (value * 100).toFixed(2) + '%';
       }
-      return value.toFixed(2); // Default to 2 decimal places for numbers
+      return value.toFixed(2); // Default to 2 decimal places for other numbers
     }
     return String(value);
   };

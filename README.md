@@ -1,235 +1,160 @@
-# 量化交易策略系统
+# 量化交易策略系统 (Quantitative Stock Analysis System)
 
-## 项目简介
+## Project Overview
 
-这是一个基于Python的量化交易策略系统，通过多维度技术分析和机器学习模型，为A股市场提供选股策略建议。系统具备动态资源管理能力，可以自适应调整运行参数，提供包括超短线交易在内的多种分析维度。
+This project is a quantitative stock analysis system designed for the A-share market. It combines a Python backend for data fetching, financial indicator calculation, and machine learning-based stock selection, with a Next.js web application for user interaction and results display. The system is containerized using Docker for easy deployment and is designed to operate in a pure memory mode, making it suitable for platforms with ephemeral file systems like Hugging Face Spaces and ModelScope.
 
-## 主要功能
+## Features
 
-- A股市场股票数据自动获取和分析
-- 机器学习模型预测股票趋势
-- 多维度技术指标分析
-- 超短线交易策略分析
-- 动态多线程管理
-- 实时性能监控
+*   **Python Backend:**
+    *   Fetches A-share stock data (historical prices, daily fundamentals, annual financial reports).
+    *   Calculates a variety of technical and fundamental indicators.
+    *   Utilizes a LightGBM machine learning model for stock trend prediction.
+    *   Implements a strategy to select promising stocks based on a combination of factors.
+*   **Key Indicators Used:**
+    *   **Technical:** Moving Averages (MA), Relative Strength Index (RSI), Moving Average Convergence Divergence (MACD), Volatility, Momentum, Volume Ratios.
+    *   **Fundamental (Daily):** P/E Ratio (PE), P/B Ratio (PB), P/S Ratio (PS), Dividend Yield Ratio, Total Market Value.
+    *   **Fundamental (Annual):** Earnings Per Share (EPS), Book Value Per Share (BVPS), Return On Equity (ROE), Debt-to-Asset Ratio, Gross Profit Margin, Net Profit Margin.
+*   **Next.js Frontend:**
+    *   Provides a web interface to trigger the analysis and display selected stocks and their key metrics.
+    *   Communicates with the Python backend via a Next.js API route.
+*   **Docker Support:**
+    *   Includes a `Dockerfile` for building a containerized version of the application.
+    *   Facilitates deployment on platforms like Hugging Face Spaces, ModelScope, or any Docker-compatible environment.
+*   **Pure Memory Mode:**
+    *   Designed to operate primarily in memory, minimizing reliance on a persistent file system for core operations (e.g., data caching is in-memory).
 
-## 技术特点
+## Project Structure
 
-- 智能数据缓存机制
-- 自适应系统资源管理
-- 多数据源容错机制
-- 异常检测和自动处理
-- 完整的中文界面
-
-## 系统要求
-
-### 硬件要求
-
-- CPU: 建议4核及以上
-- 内存: 建议8GB及以上
-- 硬盘空间: 至少1GB可用空间
-
-### 操作系统
-
-- Windows 10/11
-- macOS 10.15及以上
-- Linux (Ubuntu 18.04及以上)
-
-### Python环境
-
-- Python 3.8及以上版本
-- pip包管理器
-
-## 安装步骤
-
-1.  **安装Python环境**
-
-    如果尚未安装Python，请从官方网站下载并安装：[https://www.python.org/downloads/](https://www.python.org/downloads/)
-
-2.  **创建虚拟环境（推荐）**
-
-    ```bash
-    # 创建虚拟环境
-    python -m venv venv
-
-    # 激活虚拟环境
-    ## Windows
-    venv\Scripts\activate
-    ## macOS/Linux
-    source venv/bin/activate
-    ```
-
-3.  **更换pip源 (国内用户推荐)**
-
-    为了加快依赖包的下载速度，国内用户可以考虑更换pip的软件源。以下是使用阿里云源的命令：
-
-    ```bash
-    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
-    pip config set global.trusted-host mirrors.aliyun.com
-    ```
-
-4.  **安装依赖包**
-
-    创建 `requirements.txt` 文件并安装依赖：
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-    `requirements.txt` 内容：
-
-    ```
-    pandas>=1.3.0
-    numpy>=1.20.0
-    akshare>=1.8.0
-    baostock>=0.8.8
-    scikit-learn>=0.24.0
-    lightgbm>=3.3.0
-    psutil>=5.8.0
-    tqdm>=4.65.0
-    py-mini-racer>=0.6.0
-    ```
-
-## 配置说明
-
-### 1. 系统资源配置
-
-在`main.py`中可以调整以下参数：
-
-- `min_workers`: 最小线程数（默认4）
-- `max_workers`: 最大线程数（默认10）
-- `cpu_threshold`: CPU使用率阈值（默认75%）
-- `memory_threshold`: 内存使用率阈值（默认85%）
-
-### 2. 选股参数配置
-
-可以根据需要调整以下筛选条件：
-
-- 上涨概率阈值（默认>60%）
-- 动量得分要求（默认>-10%）
-- RSI范围（默认30-75）
-- 波动率限制（默认<60%）
-- 日均成交量要求（默认>5万）
-- 股价限制（默认>3元）
-
-## 运行说明
-
-### 1. 基本运行
-
-```bash
-python main.py
+```
+.
+├── app.py                  # Main Python application entry point (strategy execution)
+├── Dockerfile              # For building and deploying the application
+├── requirements.txt        # Python backend dependencies
+├── src/                    # Python backend source code
+│   ├── core/               # Core logic: strategy, data fetching, indicators, ML model
+│   │   ├── data_fetcher.py
+│   │   ├── indicators.py
+│   │   ├── model.py
+│   │   └── strategy.py
+│   └── utils/              # Helper utilities (e.g., retry decorators)
+│       └── helpers.py
+├── webapp/                 # Next.js frontend application
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── api/run-strategy/route.ts # API route to trigger Python script
+│   │   │   └── page.tsx                # Main page component
+│   │   └── ...             # Other Next.js files (components, public, etc.)
+│   ├── package.json
+│   └── next.config.js
+└── tests/                  # Unit and integration tests
+    ├── api/
+    └── core/
 ```
 
-### 2. 输出说明
+## Prerequisites
 
-程序运行后将显示：
+*   **Python:** 3.10 or higher.
+*   **Node.js:** v18 or higher (for `webapp` development and building).
+*   **Docker:** Required if building or running the application using Docker.
+*   **pip:** For Python package management.
+*   **npm:** For Node.js package management.
 
-- 选出的标的（前20名）
-- 15日均线在15元以内的标的
-- 超短线爆发潜力股票（前20名）
-- 15日均线在15元以内的爆发潜力股票
-- 详细的选股说明和风险提示
+## Installation & Setup (Local Development)
 
-### 3. 性能监控
+1.  **Clone the Repository:**
+    ```bash
+    git clone <repository_url>
+    cd <repository_directory>
+    ```
 
-程序会实时显示：
+2.  **Python Backend Setup:**
+    *   It's recommended to use a virtual environment:
+        ```bash
+        python -m venv venv
+        # Windows:
+        # venv\Scripts\activate
+        # macOS/Linux:
+        source venv/bin/activate
+        ```
+    *   Install Python dependencies:
+        ```bash
+        pip install -r requirements.txt
+        ```
+        *(For users in mainland China, consider using a local pip mirror for faster downloads, e.g., `pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple`)*
 
-- CPU和内存使用率
-- 处理进度
-- 成功/失败统计
-- 平均处理时间
-- 系统资源使用峰值
+3.  **Next.js Frontend Setup:**
+    ```bash
+    cd webapp
+    npm install
+    cd .. 
+    ```
 
-## 注意事项
+## How to Run (Local Development)
 
-### 1. 数据源说明
+The system is designed to be primarily accessed via its web interface.
 
-- 使用akshare获取A股数据
-- 使用baostock作为备用数据源
-- 建议在交易时段运行以获取最新数据
+1.  **Start the Next.js Development Server:**
+    This server will handle API requests and forward them to the Python backend.
+    ```bash
+    cd webapp
+    npm run dev
+    ```
+    The web application will typically be available at `http://localhost:3000`. Open this URL in your browser. The page will automatically fetch and display the strategy results by calling the backend API.
 
-### 2. 风险提示
+2.  **Alternative: Running Python Script Directly (for CLI output or debugging):**
+    You can also run the Python backend script directly from the project root:
+    *   For detailed console output (including logs, statistics, and tables):
+        ```bash
+        python app.py
+        ```
+    *   For JSON output (this is what the Next.js API route uses):
+        ```bash
+        python app.py --json-output
+        ```
 
-程序输出结果仅供参考，不构成投资建议。投资者需要：
+## How to Run (Docker)
 
-- 结合市场环境和个人风险承受能力做出投资决策
-- 建议在首次运行时使用小规模数据测试
-- 理性分析，谨慎决策
-- 严格执行风险控制
+1.  **Build the Docker Image:**
+    From the project root directory:
+    ```bash
+    docker build -t quant-analysis-app .
+    ```
 
-### 3. 故障排除
+2.  **Run the Docker Container:**
+    ```bash
+    docker run -p 3000:3000 quant-analysis-app
+    ```
+    This will start the Next.js application, which serves the frontend and the API route that executes the Python backend.
 
-如遇到问题：
+3.  **Access the Web Interface:**
+    Open `http://localhost:3000` in your web browser.
 
-1. 检查网络连接是否正常
-2. 确认依赖包是否正确安装
-3. 查看是否有足够的系统资源
-4. 检查Python版本是否符合要求
+## Deployment
 
-### 4. 性能优化建议
+The provided `Dockerfile` is designed for easy deployment on various platforms supporting Docker containers, such as:
+*   Hugging Face Spaces
+*   ModelScope
+*   Other cloud platforms (AWS, GCP, Azure, etc.)
 
-- 适当调整线程数以匹配系统配置
-- 定期清理缓存数据
-- 避免同时运行其他资源密集型程序
-- 建议在固态硬盘上运行以提高IO性能
+The application runs on port `3000` within the container, which should be mapped to an external port.
 
-## 变更日志
+## Web Interface
 
-### [1.0.0] - 2025-02-28
+The web interface provides a user-friendly way to:
+*   Automatically trigger the execution of the quantitative analysis strategy upon loading.
+*   View the selected stocks along with their key performance indicators and financial metrics in a tabular format.
+*   See loading and error states during the data fetching and processing.
 
-#### 新增功能
+## Pure Memory Mode
 
-- 实现完整的A股市场数据获取和分析系统
-- 引入动态多线程管理机制，自适应系统资源使用
-- 开发多维度技术指标分析系统
-- 实现基于机器学习的股票趋势预测模型
-- 添加超短线交易策略分析功能
-- 集成实时性能监控和统计系统
+The system is designed to operate primarily in memory. Data caching (e.g., for fetched stock data) is done in-memory within the Python process. This ensures compatibility with platforms that have ephemeral or read-only file systems, common in serverless or containerized deployment environments.
 
-#### 核心特性
+## Author
 
-- **数据处理**
-    - 支持全市场A股数据自动获取和更新
-    - 实现智能数据缓存机制，提高数据处理效率
-    - 添加数据异常检测和自动处理功能
-    - 集成多数据源支持，提高数据可靠性
-- **分析系统**
-    - 开发多维度技术指标计算和分析功能
-    - 实现机器学习模型自动训练和预测
-    - 添加动量和趋势分析功能
-    - 集成超短线交易策略分析
-    - 实现自适应参数优化系统
-- **性能优化**
-    - 实现动态线程管理，优化系统资源使用
-    - 添加实时性能监控功能
-    - 开发自适应资源分配机制
-    - 实现异常处理和自动恢复功能
-- **用户界面**
-    - 完整的中文界面支持
-    - 实时进度显示功能
-    - 详细的统计信息展示
-    - 完整的风险提示系统
+-   Developer: Mison
+-   Contact: 1360962086@qq.com
 
-#### 已知问题
-
-- 系统内存占用较高时线程数调整可能不够灵活
-- 部分股票数据获取可能需要多次重试
-- 首次运行时数据加载时间较长
-
-## 技术支持
-
-如遇问题，请参考以下步骤：
-
-1. 检查错误日志
-2. 确认系统环境是否满足要求
-3. 尝试重新安装依赖包
-4. 如问题持续，请提供详细的错误信息和运行环境说明
-
-## 作者
-
-- 开发者：[Mison]
-- 联系方式：[1360962086@qq.com]
-
-## 许可证
+## License
 
 MIT License
