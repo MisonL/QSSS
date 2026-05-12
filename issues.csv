@@ -1,0 +1,11 @@
+ID,标题,内容,验收标准,审查要求,状态,标签
+QSSS-000,仓库规范化与测试基线恢复,"补齐 AGENTS.md、issues.csv、.gitignore；清理 uv.lock 和缓存副产物；保持现有源码改动不被回退。","git status 不再出现 uv.lock 和缓存目录；默认 pytest 可执行并进入业务测试；AGENTS.md 指向 issues.csv。","核对 git status；运行默认 pytest；确认未执行 reset/revert。",已完成,高优先级
+QSSS-001,修复 pytdx 实时行情字段契约,"修复 PytdxAdapter.get_realtime_data 中 name、volume、time 等字段映射，按 pytdx 实测返回 vol、servertime 等字段定义稳定输出。","新增非 external contract 测试；模拟 pytdx quote 返回时输出列名和类型稳定；真实字段缺失时显式失败或显式空值策略。","检查字段来源；确认未 mock 成功路径；运行相关测试。",已完成,高优先级
+QSSS-002,统一 Python 依赖声明,"以 pyproject.toml 为主依赖源，明确 pytdx、AKShare、BaoStock、Tushare、LightGBM 的默认或可选归属，并同步 README 安装说明。","pyproject.toml、requirements.txt、web/requirements.txt 口径一致；安装命令可复现；默认测试依赖可一次安装。","比对三个依赖文件；运行安装或最小 import 验证。",已完成,高优先级
+QSSS-003,恢复 AKShare 板块和资金流数据源,"将 AKShare 作为板块、概念、资金流补充源接入 DataManager，不与 pytdx 实时行情职责混用。","可通过统一接口获取至少一个板块列表和板块资金流样例；失败路径保留真实错误信息。","确认没有隐藏降级；外部请求测试标记 external；记录接口字段。",已完成,高优先级
+QSSS-004,新增同花顺本地板块成分读取器,"只读解析本机 block_conception.ini 和 block_industry.ini，产出概念/行业板块成分映射，不依赖登录态和私有 socket。","可解析人工智能、CPO、存储芯片、智能电网等板块成分；路径不存在时给出明确错误。","检查无 token/cookie 读取；补充样例或 fixture 测试。",已完成,高优先级
+QSSS-005,修正 CLI 参数行为,"让 qsss analyze --start-date 和 --limit 真正传入分析流程，或移除/标注文档中的预留行为。","CLI 参数影响实际分析范围；README 与 click 帮助一致。","运行 CLI 最小 smoke；检查 README 不再承诺未实现行为。",已完成,待确认
+QSSS-006,设计 SQLite MVP 落库,"建立 stocks、bars_daily、quotes_snapshot、concept_boards、board_members、board_flow_snapshots、watchlists、signals 的最小 schema。","迁移或初始化脚本可重复执行；关键字段类型和唯一约束明确。","检查 schema 契约；确认时间、代码、量价字段单位一致。",已完成,待确认
+QSSS-007,Web MVP 行情和板块页面,"实现行情总览、板块轮动、AI 科技观察池三个可用页面，优先展示真实采集数据。","本地 Web 可启动；页面能展示指数、自选池、板块强度和 AI 科技观察池。","浏览器 smoke；检查无静态假数据冒充实时数据。",已完成,待确认
+QSSS-008,清理装饰性字符存量,"清理 README、web/README.md、交互脚本和运行脚本中的 emoji、Unicode 装饰符号和框线字符，改用普通 Markdown、ASCII 文本和明确状态词。","rg 扫描常见 emoji 和框线字符无命中；用户可见命令行输出不再依赖特殊符号表达状态。","运行装饰字符扫描；抽查 CLI/Web 启动输出仍可读。",已完成,待确认
+QSSS-009,免费优先行情数据源替换方案,"基于 pytdx、AKShare、BaoStock、同花顺本地缓存和 iFinD 免费额度制定 capability-based routing 替换方案，明确字段契约、采样频率、额度护栏和分阶段任务。","docs/design/market-data-sources.md 存在；方案明确实时行情、板块资金流、历史数据、板块成分、增强兜底的主源和边界；不直接修改主链实现。","核对方案文档；确认没有同花顺私有协议和登录态依赖；确认后续任务仍拆成原子任务。",已完成,高优先级

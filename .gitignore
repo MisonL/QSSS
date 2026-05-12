@@ -1,2 +1,37 @@
 .idea/
 .venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Runtime artifacts
+logs/
+*.log
+*.tmp
+data/cache/
+data/processed/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# OS and editor noise
+.DS_Store
+
+# uv may be used for ephemeral local runs in this repo.
+uv.lock

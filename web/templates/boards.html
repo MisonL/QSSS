@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}板块轮动 - QSSS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">板块轮动</h1>
+        <p class="text-muted mb-0">展示 AKShare 返回的概念板块和资金流。</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">数据源错误: {{ error }}</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <h2 class="h5 mb-3">概念板块</h2>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>涨跌幅</th>
+                        <th>成交额</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in boards %}
+                    <tr>
+                        <td>{{ row.board_code }}</td>
+                        <td>{{ row.board_name }}</td>
+                        <td>{{ row.pct_chg if row.pct_chg is defined else "-" }}</td>
+                        <td>{{ row.amount if row.amount is defined else "-" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-muted">暂无真实板块数据。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+        <h2 class="h5 mb-3">资金流</h2>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>净流入</th>
+                        <th>主力净流入</th>
+                        <th>来源</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in flows %}
+                    <tr>
+                        <td>{{ row.board_name }}</td>
+                        <td>{{ row.net_inflow if row.net_inflow is defined else "-" }}</td>
+                        <td>{{ row.main_net_inflow if row.main_net_inflow is defined else "-" }}</td>
+                        <td>{{ row.source }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-muted">暂无真实资金流数据。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

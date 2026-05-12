@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}AI 科技观察池 - QSSS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">AI 科技观察池</h1>
+        <p class="text-muted mb-0">观察池代码: {{ symbols|join(", ") }}</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">数据源错误: {{ error }}</div>
+{% endif %}
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>代码</th>
+                <th>名称</th>
+                <th>最新价</th>
+                <th>涨跌幅</th>
+                <th>来源</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.symbol }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.price if row.price is defined else "-" }}</td>
+                <td>{{ row.pct_chg if row.pct_chg is defined else "-" }}</td>
+                <td>{{ row.source if row.source is defined else "-" }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="text-muted">暂无真实观察池行情数据。</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
