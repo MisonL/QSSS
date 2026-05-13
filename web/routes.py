@@ -21,8 +21,21 @@ from src.qsss.data.manager import data_manager  # noqa: E402
 # 简单的内存级全市场分析任务管理（避免依赖 Redis/Celery 也能展示进度和日志）
 _market_jobs_lock = threading.Lock()
 _market_jobs: Dict[str, Dict[str, Any]] = {}
+_backtest_jobs_lock = threading.Lock()
+_backtest_jobs: Dict[str, Dict[str, Any]] = {}
 _boards_cache_lock = threading.Lock()
 _boards_cache: Dict[str, Dict[str, Any]] = {}
+SENSITIVE_PARAMETER_KEYS = {
+    "api_key",
+    "apikey",
+    "authorization",
+    "client_secret",
+    "cookie",
+    "password",
+    "secret",
+    "secret_key",
+    "token",
+}
 CELERY_TASK_ID_PATTERN = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
@@ -103,9 +116,14 @@ def stock_detail(stock_id: int) -> str:
 def strategies() -> str:
     """策略列表页面"""
     strategies = Strategy.query.filter_by(is_active=True).all()
-    return render_template(
-        "strategies.html", strategies=[s.to_dict() for s in strategies]
-    )
+    strategy_rows = []
+    for strategy in strategies:
+        row = strategy.to_dict()
+        row["sanitized_parameters"] = _sanitize_strategy_parameters(
+            row.get("parameters")
+        )
+        strategy_rows.append(row)
+    return render_template("strategies.html", strategies=strategy_rows)
 
 
 @app.route("/backtests")
@@ -119,6 +137,12 @@ def backtests() -> str:
     )
 
     return render_template("backtests.html", backtests=backtests)
+
+
+@app.route("/backtest")
+def backtest() -> str:
+    """回测创建页面。"""
+    return render_template("backtest.html")
 
 
 @app.route("/analysis")
@@ -142,7 +166,9 @@ def market_overview() -> str:
     error = None
     try:
         index_rows = _records(data_manager.get_realtime_data(INDEX_SYMBOLS))
-        watchlist_rows = _records(data_manager.get_realtime_data(DEFAULT_WATCHLIST_SYMBOLS))
+        watchlist_rows = _records(
+            data_manager.get_realtime_data(DEFAULT_WATCHLIST_SYMBOLS)
+        )
     except Exception as exc:
         app.logger.exception("行情总览数据源请求失败: %s", exc)
         error = PUBLIC_DATA_SOURCE_ERROR
@@ -230,7 +256,9 @@ def _get_board_rotation_payload() -> dict[str, list[dict[str, Any]]]:
 def _build_board_strength_rows(
     boards: list[dict[str, Any]], flows: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    flow_by_code = {row.get("board_code"): row for row in flows if row.get("board_code")}
+    flow_by_code = {
+        row.get("board_code"): row for row in flows if row.get("board_code")
+    }
     rows = []
     for board in boards:
         board_code = board.get("board_code")
@@ -335,9 +363,34 @@ def analyze_market() -> Any:
 
 @app.route("/api/backtest", methods=["POST"])
 def create_backtest() -> Any:
-    """创建回测任务API（当前版本暂未实现回测逻辑）"""
-    # 为避免误用，直接返回友好的错误提示
-    return jsonify({"error": "回测功能尚未实现，当前版本仅支持选股分析"}), 501
+    """创建回测任务API。"""
+    payload = request.get_json(silent=True) or {}
+    try:
+        backtest = _create_backtest_record(payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("创建回测任务失败: %s", exc)
+        return jsonify({"error": PUBLIC_BACKTEST_ERROR}), 500
+
+    task_id = str(uuid.uuid4())
+    with _backtest_jobs_lock:
+        _backtest_jobs[task_id] = {
+            "state": "PENDING",
+            "status": "任务等待执行",
+            "result": None,
+            "error": None,
+        }
+
+    if app.config.get("TESTING"):
+        _run_backtest_worker(task_id, backtest.id)
+    else:
+        thread = threading.Thread(
+            target=_run_backtest_worker, args=(task_id, backtest.id), daemon=True
+        )
+        thread.start()
+
+    return jsonify({"task_id": task_id, "backtest_id": backtest.id})
 
 
 @app.route("/api/market_status/<job_id>")
@@ -369,6 +422,9 @@ def get_task_status(task_id: str) -> Any:
     """查询 Celery 异步任务状态。"""
     if not CELERY_TASK_ID_PATTERN.fullmatch(task_id):
         return jsonify({"error": "任务 ID 格式无效"}), 400
+    backtest_job = _get_backtest_job_response(task_id)
+    if backtest_job is not None:
+        return jsonify(backtest_job)
     task = celery.AsyncResult(task_id)
     if task.state == "PENDING":
         return jsonify({"state": task.state, "status": "任务等待执行"})
@@ -384,6 +440,213 @@ def get_task_status(task_id: str) -> Any:
         app.logger.error("Celery 任务失败: task_id=%s info=%s", task_id, task.info)
         return jsonify({"state": task.state, "error": PUBLIC_ANALYSIS_ERROR})
     return jsonify({"state": task.state, "status": str(task.info or task.state)})
+
+
+def _create_backtest_record(payload: dict[str, Any]) -> Backtest:
+    stock_code = str(payload.get("stock_code") or "").strip()
+    if not re.fullmatch(r"\d{6}", stock_code):
+        raise ValueError("股票代码格式无效")
+
+    start_date = _parse_backtest_date(payload.get("start_date"), "开始日期")
+    end_date = _parse_backtest_date(payload.get("end_date"), "结束日期")
+    if start_date >= end_date:
+        raise ValueError("开始日期必须早于结束日期")
+
+    initial_capital = _parse_positive_float(
+        payload.get("initial_capital"), "初始资金", 100000.0
+    )
+
+    strategy = _get_or_create_strategy(payload.get("strategy_id"))
+    stock = _get_or_create_stock(stock_code)
+    backtest = Backtest(
+        stock_id=stock.id,
+        strategy_id=strategy.id,
+        start_date=start_date,
+        end_date=end_date,
+        initial_capital=initial_capital,
+        status="pending",
+    )
+    db.session.add(backtest)
+    db.session.commit()
+    return backtest
+
+
+def _parse_backtest_date(value: Any, field_name: str) -> date:
+    try:
+        return datetime.strptime(str(value or ""), "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError(f"{field_name}格式无效") from exc
+
+
+def _parse_positive_float(value: Any, field_name: str, default: float) -> float:
+    raw_value = default if value is None else value
+    try:
+        parsed = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name}格式无效") from exc
+    if parsed <= 0:
+        raise ValueError(f"{field_name}必须大于 0")
+    return parsed
+
+
+def _sanitize_strategy_parameters(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if _is_sensitive_parameter_key(key_text):
+                sanitized[key] = "[REDACTED]"
+            else:
+                sanitized[key] = _sanitize_strategy_parameters(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_strategy_parameters(item) for item in value]
+    return value
+
+
+def _is_sensitive_parameter_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    return normalized in SENSITIVE_PARAMETER_KEYS or any(
+        token in normalized
+        for token in ("api_key", "apikey", "password", "secret", "token")
+    )
+
+
+def _get_or_create_strategy(strategy_id: Any) -> Strategy:
+    if strategy_id not in (None, ""):
+        try:
+            strategy = db.session.get(Strategy, int(strategy_id))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("策略 ID 格式无效") from exc
+        if strategy is None:
+            raise ValueError("策略不存在")
+        if strategy.type != "buy_hold":
+            raise ValueError("当前 Web 回测仅支持买入持有基线策略")
+        return strategy
+
+    strategy = Strategy.query.filter_by(name="买入持有基线").first()
+    if strategy is None:
+        strategy = Strategy(
+            name="买入持有基线",
+            description="使用真实日线收盘价计算买入持有基线回测指标",
+            type="buy_hold",
+            parameters={},
+            is_active=True,
+        )
+        db.session.add(strategy)
+        db.session.commit()
+    return strategy
+
+
+def _get_or_create_stock(stock_code: str) -> Stock:
+    stock = Stock.query.filter_by(code=stock_code).first()
+    if stock is not None:
+        return stock
+
+    stock_name = stock_code
+    stock_market = "未知"
+    try:
+        stocks_df = data_manager.get_stock_list()
+        if stocks_df is not None and not stocks_df.empty:
+            row = stocks_df[stocks_df["symbol"] == stock_code]
+            if not row.empty:
+                stock_name = str(row.iloc[0]["name"])
+                stock_market = str(row.iloc[0]["market"])
+    except Exception as exc:
+        app.logger.warning("获取股票元数据失败，使用股票代码作为名称: %s", exc)
+
+    stock = Stock(code=stock_code, name=stock_name, market=stock_market)
+    db.session.add(stock)
+    db.session.commit()
+    return stock
+
+
+def _run_backtest_worker(task_id: str, backtest_id: int) -> None:
+    with app.app_context():
+        _set_backtest_job(task_id, state="PROGRESS", status="正在获取历史数据")
+        backtest = db.session.get(Backtest, backtest_id)
+        if backtest is None:
+            _set_backtest_job(task_id, state="FAILURE", error=PUBLIC_BACKTEST_ERROR)
+            return
+
+        try:
+            result = _run_backtest_core(backtest)
+            _save_backtest_result(backtest, result)
+            _set_backtest_job(task_id, state="SUCCESS", result=result)
+        except Exception as exc:
+            db.session.rollback()
+            _mark_backtest_failed(backtest_id)
+            app.logger.exception("回测任务执行失败: %s", exc)
+            _set_backtest_job(task_id, state="FAILURE", error=PUBLIC_BACKTEST_ERROR)
+
+
+def _run_backtest_core(backtest: Backtest) -> dict[str, Any]:
+    stock = backtest.stock
+    if stock is None:
+        raise ValueError("回测任务缺少股票信息")
+    strategy_config = backtest.strategy
+    if strategy_config is None or strategy_config.type != "buy_hold":
+        raise ValueError("当前 Web 回测仅支持买入持有基线策略")
+
+    start_date = backtest.start_date.strftime("%Y%m%d")
+    end_date = backtest.end_date.strftime("%Y%m%d")
+    stock_data = data_manager.get_daily_data(stock.code, start_date, end_date)
+    if stock_data is None or stock_data.empty:
+        raise ValueError("无法获取回测历史数据")
+
+    strategy = QuantStrategy()
+    result = strategy.backtest(
+        stock_data=stock_data,
+        strategy_type=strategy_config.type,
+        parameters={"initial_capital": backtest.initial_capital},
+    )
+    if result.get("error"):
+        raise RuntimeError(str(result["error"]))
+    return result
+
+
+def _save_backtest_result(backtest: Backtest, result: dict[str, Any]) -> None:
+    backtest.total_return = result.get("total_return", 0)
+    backtest.annual_return = result.get("annual_return", 0)
+    backtest.max_drawdown = result.get("max_drawdown", 0)
+    backtest.sharpe_ratio = result.get("sharpe_ratio", 0)
+    backtest.win_rate = result.get("win_rate", 0)
+    backtest.total_trades = result.get("total_trades", 0)
+    backtest.results = result
+    backtest.status = "completed"
+    backtest.completed_at = datetime.utcnow()
+    db.session.commit()
+
+
+def _mark_backtest_failed(backtest_id: int) -> None:
+    db.session.remove()
+    backtest = db.session.get(Backtest, backtest_id)
+    if backtest is None:
+        return
+    backtest.status = "failed"
+    db.session.commit()
+
+
+def _set_backtest_job(task_id: str, **updates: Any) -> None:
+    with _backtest_jobs_lock:
+        job = _backtest_jobs.setdefault(task_id, {})
+        job.update(updates)
+
+
+def _get_backtest_job_response(task_id: str) -> dict[str, Any] | None:
+    with _backtest_jobs_lock:
+        job = _backtest_jobs.get(task_id)
+        if job is None:
+            return None
+        state = job.get("state", "PENDING")
+        response = {"state": state}
+        if state == "SUCCESS":
+            response["result"] = job.get("result")
+        elif state == "FAILURE":
+            response["error"] = job.get("error") or PUBLIC_BACKTEST_ERROR
+        else:
+            response["status"] = job.get("status") or "正在处理"
+        return response
 
 
 @celery.task(bind=True)
@@ -569,15 +832,16 @@ def _market_analysis_worker(job_id: str, limit: int) -> None:
             )
 
 
-def _run_market_analysis_core(
-    limit: int = 50, progress_callback: Any = None
-) -> dict:
+def _run_market_analysis_core(limit: int = 50, progress_callback: Any = None) -> dict:
     """在当前进程中执行全市场量化选股分析的核心逻辑。"""
     try:
         strategy = QuantStrategy()
-        selected_df = strategy.run_analysis(progress_callback=progress_callback)
+        selected_df = strategy.run_analysis(
+            limit=limit,
+            progress_callback=progress_callback,
+        )
         if selected_df is None or selected_df.empty:
-            return {"error": "未找到符合条件的股票"}
+            return {"count": 0, "results": []}
 
         # 限制返回数量
         try:
@@ -676,6 +940,18 @@ def perform_market_analysis(self: Any, limit: int = 50) -> dict:
 
 @celery.task(bind=True)
 def perform_backtest(self: Any, backtest_id: int) -> dict:
-    """异步执行回测（占位实现，当前版本未提供具体回测逻辑）"""
-    # 直接返回错误信息，避免误用旧接口
-    return {"error": PUBLIC_BACKTEST_ERROR}
+    """异步执行回测。"""
+    self.update_state(state="PROGRESS", meta={"status": "正在运行回测..."})
+    with app.app_context():
+        backtest = db.session.get(Backtest, backtest_id)
+        if backtest is None:
+            return {"error": PUBLIC_BACKTEST_ERROR}
+        try:
+            result = _run_backtest_core(backtest)
+            _save_backtest_result(backtest, result)
+            return result
+        except Exception as exc:
+            db.session.rollback()
+            _mark_backtest_failed(backtest_id)
+            app.logger.exception("Celery 回测任务失败: %s", exc)
+            return {"error": PUBLIC_BACKTEST_ERROR}

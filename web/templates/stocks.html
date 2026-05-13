@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1 class="fw-bold text-primary mb-2">股票列表</h1>
+        <p class="text-muted mb-0">本地数据库中的股票基础信息。</p>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-transparent border-bottom border-light py-3">
+        <h5 class="card-title mb-0 fw-bold">股票基础信息</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>市场</th>
+                    <th>行业</th>
+                    <th>更新时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stock in stocks.items %}
+                <tr>
+                    <td class="font-monospace">{{ stock.code }}</td>
+                    <td>{{ stock.name }}</td>
+                    <td>{{ stock.market }}</td>
+                    <td>{{ stock.industry or "-" }}</td>
+                    <td>{{ stock.updated_at.strftime("%Y-%m-%d %H:%M") if stock.updated_at else "-" }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-5">
+                        暂无股票基础信息。
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if stocks.pages > 1 %}
+    <div class="card-footer bg-white border-top border-light">
+        <nav aria-label="股票列表分页">
+            <ul class="pagination pagination-sm mb-0">
+                {% for page_num in stocks.iter_pages() %}
+                    {% if page_num %}
+                    <li class="page-item {{ 'active' if page_num == stocks.page else '' }}">
+                        <a class="page-link" href="{{ url_for('stocks', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

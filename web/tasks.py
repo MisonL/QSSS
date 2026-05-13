@@ -44,7 +44,13 @@ def _resolve_stock_info(data_manager: Any, stock_code: str) -> Dict[str, str]:
 @celery.task(bind=True)
 def run_backtest_task(self: Any, backtest_id: int) -> dict:
     """异步回测任务"""
-    backtest = Backtest.query.get(backtest_id)
+    from web.routes import (
+        _mark_backtest_failed,
+        _run_backtest_core,
+        _save_backtest_result,
+    )
+
+    backtest = db.session.get(Backtest, backtest_id)
     if not backtest:
         app.logger.error("回测任务不存在: backtest_id=%s", backtest_id)
         return {"status": "failed", "error": PUBLIC_BACKTEST_ERROR}
@@ -53,60 +59,18 @@ def run_backtest_task(self: Any, backtest_id: int) -> dict:
         # 更新状态为运行中
         backtest.status = "running"
         db.session.commit()
-
-        # 获取股票和策略信息
-        stock = backtest.stock
-        strategy = backtest.strategy
-
-        # 初始化数据管理器
-        data_manager = DataManager()
-
-        # 获取历史数据
-        start_date = backtest.start_date.strftime("%Y-%m-%d")
-        end_date = backtest.end_date.strftime("%Y-%m-%d")
-
-        # 获取股票数据
-        stock_data = data_manager.get_daily_data(
-            stock.code, start_date=start_date, end_date=end_date
-        )
-
-        if stock_data.empty:
-            raise ValueError("无法获取股票数据")
-
-        # 初始化策略
-        quant_strategy = QuantStrategy()
-
-        if not hasattr(quant_strategy, "backtest"):
-            raise NotImplementedError("核心策略未实现 backtest 方法")
-
-        results: Dict[str, Any] = quant_strategy.backtest(  # type: ignore[attr-defined]
-            stock_data=stock_data,
-            strategy_type=strategy.type,
-            parameters=strategy.parameters or {},
-        )
+        results = _run_backtest_core(backtest)
         if results.get("error"):
             raise RuntimeError(str(results["error"]))
-
-        # 更新回测结果
-        backtest.total_return = results.get("total_return", 0)
-        backtest.annual_return = results.get("annual_return", 0)
-        backtest.max_drawdown = results.get("max_drawdown", 0)
-        backtest.sharpe_ratio = results.get("sharpe_ratio", 0)
-        backtest.win_rate = results.get("win_rate", 0)
-        backtest.total_trades = results.get("total_trades", 0)
-        backtest.results_data = results
-        backtest.status = "completed"
-        backtest.completed_at = datetime.utcnow()
-
-        db.session.commit()
+        _save_backtest_result(backtest, results)
 
         return {"status": "completed", "backtest_id": backtest_id, "results": results}
 
     except Exception as e:
-        # 更新错误状态
-        backtest.status = "failed"
-        db.session.commit()
-        app.logger.exception("回测任务执行失败: backtest_id=%s error=%s", backtest_id, e)
+        _mark_backtest_failed(backtest_id)
+        app.logger.exception(
+            "回测任务执行失败: backtest_id=%s error=%s", backtest_id, e
+        )
 
         return {
             "status": "failed",
@@ -142,7 +106,9 @@ def run_analysis_task(
 
         quant_strategy = QuantStrategy()
         stock_info = _resolve_stock_info(data_manager, stock_code)
-        analysis_result: Dict[str, Any] = quant_strategy.analyze_single_stock(stock_info)
+        analysis_result: Dict[str, Any] = quant_strategy.analyze_single_stock(
+            stock_info
+        )
         if not analysis_result:
             raise ValueError("策略未返回有效分析结果")
         if analysis_result.get("error"):

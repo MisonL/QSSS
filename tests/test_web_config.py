@@ -1,18 +1,18 @@
 """Web configuration contract tests."""
 
+import importlib.util
 import os
 import stat
 import subprocess
 import sys
 import threading
-import importlib.util
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from web.config import is_production_environment, load_secret_key
+from web.config import is_production_environment, load_secret_key  # noqa: E402
 
 WEB_DEPS_AVAILABLE = all(
     importlib.util.find_spec(package) is not None

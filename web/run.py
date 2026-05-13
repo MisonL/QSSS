@@ -81,9 +81,7 @@ def init_database(app, db, stock_model, strategy_model) -> None:
                 stock_model(
                     code="000002", name="万科A", market="SZ", industry="房地产"
                 ),
-                stock_model(
-                    code="000858", name="五粮液", market="SZ", industry="白酒"
-                ),
+                stock_model(code="000858", name="五粮液", market="SZ", industry="白酒"),
                 stock_model(
                     code="600000", name="浦发银行", market="SH", industry="银行"
                 ),
@@ -149,8 +147,8 @@ def main() -> None:
     config_name = resolve_config_name(args.env or args.config)
     os.environ["QSSS_WEB_ENV"] = config_name
 
-    from web.app import app, celery  # noqa: E402
     from web.app import db  # noqa: E402
+    from web.app import app, celery  # noqa: E402
     from web.models import Stock, Strategy  # noqa: E402
 
     # 设置配置

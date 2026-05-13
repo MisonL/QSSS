@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1 class="fw-bold text-primary mb-2">{{ stock.name }}</h1>
+        <p class="text-muted mb-0">
+            <span class="font-monospace">{{ stock.code }}</span>
+            <span class="mx-2">/</span>
+            {{ stock.market }}
+            {% if stock.industry %}
+            <span class="mx-2">/</span>{{ stock.industry }}
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-bottom border-light py-3">
+                <h5 class="card-title mb-0 fw-bold">最近分析</h5>
+            </div>
+            <div class="card-body">
+                {% for analysis in analyses %}
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="d-flex justify-content-between">
+                        <strong>{{ analysis.strategy_type }}</strong>
+                        <span class="badge bg-light text-dark border">{{ analysis.recommendation or "-" }}</span>
+                    </div>
+                    <div class="text-muted small">
+                        {{ analysis.analysis_date }} / 总分 {{ analysis.total_score if analysis.total_score is not none else "-" }}
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">暂无分析记录。</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-bottom border-light py-3">
+                <h5 class="card-title mb-0 fw-bold">最近回测</h5>
+            </div>
+            <div class="card-body">
+                {% for backtest in backtests %}
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="d-flex justify-content-between">
+                        <strong>{{ backtest.strategy.name if backtest.strategy else "未知策略" }}</strong>
+                        <span class="badge bg-light text-dark border">{{ backtest.status or "未知" }}</span>
+                    </div>
+                    <div class="text-muted small">
+                        {% if backtest.start_date and backtest.end_date %}
+                            {{ backtest.start_date }} 至 {{ backtest.end_date }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">暂无回测记录。</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

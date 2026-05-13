@@ -26,13 +26,8 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="strategy-id" class="form-label fw-medium text-muted">策略</label>
-                                <select class="form-select" id="strategy-id" required>
-                                    <option value="">选择策略...</option>
-                                    <option value="1">技术分析策略</option>
-                                    <option value="2">机器学习策略</option>
-                                    <option value="3">短线爆发策略</option>
-                                </select>
+                                <label class="form-label fw-medium text-muted">策略</label>
+                                <div class="form-control bg-light">买入持有基线</div>
                             </div>
                         </div>
                     </div>
@@ -93,7 +88,7 @@
                     <h6 class="fw-bold text-dark">回测参数</h6>
                     <ul class="list-unstyled mb-0 ps-2 border-start border-2 border-light">
                         <li class="mb-1 ms-2"><strong>股票代码:</strong> 6位A股代码</li>
-                        <li class="mb-1 ms-2"><strong>策略:</strong> 选择要验证的交易逻辑</li>
+                        <li class="mb-1 ms-2"><strong>策略:</strong> 当前固定为买入持有基线</li>
                         <li class="mb-1 ms-2"><strong>时间范围:</strong> 历史数据区间</li>
                         <li class="ms-2"><strong>初始资金:</strong> 虚拟账户起始金额</li>
                     </ul>
@@ -164,13 +159,12 @@ document.getElementById('backtest-form').addEventListener('submit', function(e) 
 
     const formData = {
         stock_code: document.getElementById('stock-code').value.trim(),
-        strategy_id: parseInt(document.getElementById('strategy-id').value),
         start_date: document.getElementById('start-date').value,
         end_date: document.getElementById('end-date').value,
         initial_capital: parseFloat(document.getElementById('initial-capital').value)
     };
 
-    if (!formData.stock_code || !formData.strategy_id || !formData.start_date || !formData.end_date) {
+    if (!formData.stock_code || !formData.start_date || !formData.end_date) {
         alert('请填写完整信息');
         return;
     }
@@ -360,15 +354,6 @@ function displayBacktestResult(result) {
                     </div>
                 </div>
             </div>
-
-            {# 回测结果列表页面尚未实现，按钮暂时注释掉以避免路由错误 #}
-            {#
-            <div class="mt-4 text-center">
-                <a href="{{ url_for('backtest_results') }}" class="btn btn-outline-primary">
-                    <i class="bi bi-list-ul me-2"></i> 查看所有回测结果
-                </a>
-            </div>
-            #}
         `;
     }
 
