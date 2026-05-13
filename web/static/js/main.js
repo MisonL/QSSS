@@ -13,44 +13,59 @@ function showLoading(element) {
     `;
 }
 
+function clearElement(element) {
+    while (element.firstChild) {
+        element.removeChild(element.firstChild);
+    }
+}
+
+function appendIcon(parent, className) {
+    const icon = document.createElement('i');
+    icon.className = className;
+    parent.appendChild(icon);
+}
+
+function appendTextAlert(element, type, iconClass, message) {
+    clearElement(element);
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    appendIcon(alertDiv, iconClass);
+    alertDiv.appendChild(document.createTextNode(' ' + String(message || '')));
+    element.appendChild(alertDiv);
+}
+
 function showError(element, message) {
-    element.innerHTML = `
-        <div class="alert alert-danger">
-            <i class="bi bi-exclamation-triangle"></i>
-            ${message}
-        </div>
-    `;
+    appendTextAlert(element, 'danger', 'bi bi-exclamation-triangle', message);
 }
 
 function showSuccess(element, message) {
-    element.innerHTML = `
-        <div class="alert alert-success">
-            <i class="bi bi-check-circle"></i>
-            ${message}
-        </div>
-    `;
+    appendTextAlert(element, 'success', 'bi bi-check-circle', message);
 }
 
 // 格式化数字
 function formatNumber(num, decimals = 2) {
     if (num === null || num === undefined) return '-';
-    return parseFloat(num).toFixed(decimals);
+    const parsed = parseFloat(num);
+    return Number.isFinite(parsed) ? parsed.toFixed(decimals) : '-';
 }
 
 function formatPercent(num, decimals = 2) {
     if (num === null || num === undefined) return '-';
-    return (parseFloat(num) * 100).toFixed(decimals) + '%';
+    const parsed = parseFloat(num);
+    return Number.isFinite(parsed) ? (parsed * 100).toFixed(decimals) + '%' : '-';
 }
 
 // 显示通知
 function showNotification(message, type = 'info') {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
+    alertDiv.appendChild(document.createTextNode(String(message || '')));
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'btn-close';
+    closeButton.setAttribute('data-bs-dismiss', 'alert');
+    alertDiv.appendChild(closeButton);
+
     const container = document.querySelector('.container');
     if (container) {
         container.insertBefore(alertDiv, container.firstChild);
@@ -68,11 +83,11 @@ async function apiCall(endpoint, options = {}) {
             },
             ...options
         });
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         return await response.json();
     } catch (error) {
         console.error('API调用失败:', error);
@@ -84,11 +99,11 @@ async function apiCall(endpoint, options = {}) {
 async function pollTaskStatus(taskId, callback, interval = 1000) {
     const maxAttempts = 300; // 5分钟
     let attempts = 0;
-    
+
     const checkStatus = async () => {
         try {
             const data = await apiCall(`/api/task/${taskId}`);
-            
+
             if (data.state === 'SUCCESS') {
                 callback(null, data.result);
             } else if (data.state === 'FAILURE') {
@@ -103,7 +118,7 @@ async function pollTaskStatus(taskId, callback, interval = 1000) {
             callback(error);
         }
     };
-    
+
     checkStatus();
 }
 
@@ -111,7 +126,7 @@ async function pollTaskStatus(taskId, callback, interval = 1000) {
 async function analyzeStock(stockCode, strategyType = 'technical') {
     try {
         showNotification('正在提交分析任务...', 'info');
-        
+
         const data = await apiCall('/api/analyze', {
             method: 'POST',
             body: JSON.stringify({
@@ -119,13 +134,13 @@ async function analyzeStock(stockCode, strategyType = 'technical') {
                 strategy_type: strategyType
             })
         });
-        
+
         if (data.error) {
             throw new Error(data.error);
         }
-        
+
         showNotification('分析任务已提交，正在处理...', 'success');
-        
+
         // 开始轮询任务状态
         pollTaskStatus(data.task_id, (error, result) => {
             if (error) {
@@ -135,7 +150,7 @@ async function analyzeStock(stockCode, strategyType = 'technical') {
                 displayAnalysisResult(result);
             }
         });
-        
+
     } catch (error) {
         showNotification(`分析请求失败: ${error.message}`, 'danger');
     }
@@ -145,7 +160,7 @@ async function analyzeStock(stockCode, strategyType = 'technical') {
 async function createBacktest(stockCode, strategyId, startDate, endDate, initialCapital = 100000) {
     try {
         showNotification('正在创建回测任务...', 'info');
-        
+
         const data = await apiCall('/api/backtest', {
             method: 'POST',
             body: JSON.stringify({
@@ -156,13 +171,13 @@ async function createBacktest(stockCode, strategyId, startDate, endDate, initial
                 initial_capital: initialCapital
             })
         });
-        
+
         if (data.error) {
             throw new Error(data.error);
         }
-        
+
         showNotification('回测任务已创建，正在处理...', 'success');
-        
+
         // 开始轮询任务状态
         pollTaskStatus(data.task_id, (error, result) => {
             if (error) {
@@ -173,7 +188,7 @@ async function createBacktest(stockCode, strategyId, startDate, endDate, initial
                 location.reload();
             }
         });
-        
+
     } catch (error) {
         showNotification(`回测请求失败: ${error.message}`, 'danger');
     }
@@ -183,29 +198,29 @@ async function createBacktest(stockCode, strategyId, startDate, endDate, initial
 function displayAnalysisResult(result) {
     const modal = document.getElementById('analysis-result-modal');
     if (!modal) return;
-    
+
     const content = modal.querySelector('.modal-body');
     if (!content) return;
-    
+
     let html = '<div class="row g-4">';
-    
+
     // 基本信息
     html += '<div class="col-md-6">';
     html += '<h6 class="fw-bold mb-3 text-primary"><i class="bi bi-info-circle me-2"></i>基本信息</h6>';
     html += '<div class="card border-0 bg-light"><div class="card-body p-3">';
     html += '<table class="table table-sm table-borderless mb-0">';
     html += '<tr><td class="text-muted">综合评分</td><td class="text-end"><span class="fw-bold text-primary h5 mb-0">' + formatNumber(result.total_score) + '</span></td></tr>';
-    
+
     let badgeClass = 'secondary';
     let badgeText = 'N/A';
     if (result.recommendation === 'buy') { badgeClass = 'success'; badgeText = '买入'; }
     else if (result.recommendation === 'sell') { badgeClass = 'danger'; badgeText = '卖出'; }
     else if (result.recommendation === 'hold') { badgeClass = 'warning'; badgeText = '持有'; }
-    
+
     html += '<tr><td class="text-muted">推荐操作</td><td class="text-end"><span class="badge bg-' + badgeClass + ' bg-opacity-10 text-' + badgeClass + ' px-3 py-2 rounded-pill">' + badgeText + '</span></td></tr>';
     html += '</table></div></div>';
     html += '</div>';
-    
+
     // 技术指标
     html += '<div class="col-md-6">';
     html += '<h6 class="fw-bold mb-3 text-success"><i class="bi bi-graph-up me-2"></i>技术指标</h6>';
@@ -216,11 +231,11 @@ function displayAnalysisResult(result) {
     html += '<tr><td class="text-muted">爆发潜力</td><td class="text-end fw-medium">' + formatNumber(result.explosion_potential) + '</td></tr>';
     html += '</table></div></div>';
     html += '</div>';
-    
+
     html += '</div>';
-    
+
     content.innerHTML = html;
-    
+
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
 }
@@ -229,13 +244,13 @@ function displayAnalysisResult(result) {
 function createChart(containerId, option) {
     const container = document.getElementById(containerId);
     if (!container) return null;
-    
+
     const chart = echarts.init(container);
     chart.setOption(option);
-    
+
     // 响应式调整
     window.addEventListener('resize', () => chart.resize());
-    
+
     return chart;
 }
 
@@ -332,7 +347,7 @@ function createKLineChart(containerId, data) {
             }
         ]
     };
-    
+
     return createChart(containerId, option);
 }
 
@@ -389,7 +404,7 @@ function createBacktestChart(containerId, data) {
             }
         ]
     };
-    
+
     return createChart(containerId, option);
 }
 
@@ -400,13 +415,13 @@ document.addEventListener('DOMContentLoaded', function() {
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
-    
+
     // 初始化弹出框
     const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
     popoverTriggerList.map(function (popoverTriggerEl) {
         return new bootstrap.Popover(popoverTriggerEl);
     });
-    
+
     // 添加加载动画到所有表单提交
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {

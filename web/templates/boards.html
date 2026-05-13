@@ -15,7 +15,37 @@
 {% endif %}
 
 <div class="row">
-    <div class="col-lg-6 mb-4">
+    <div class="col-lg-4 mb-4">
+        <h2 class="h5 mb-3">板块强度</h2>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>强度</th>
+                        <th>涨跌幅</th>
+                        <th>净流入</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in strength_rows %}
+                    <tr>
+                        <td>{{ row.board_name if row.board_name is defined and row.board_name is not none else "-" }}</td>
+                        <td>{{ row.strength if row.strength is defined and row.strength is not none else "-" }}</td>
+                        <td>{{ row.pct_chg if row.pct_chg is defined and row.pct_chg is not none else "-" }}</td>
+                        <td>{{ row.net_inflow if row.net_inflow is defined and row.net_inflow is not none else "-" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-muted">暂无真实板块强度数据。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-lg-4 mb-4">
         <h2 class="h5 mb-3">概念板块</h2>
         <div class="table-responsive">
             <table class="table table-sm table-hover">
@@ -30,10 +60,10 @@
                 <tbody>
                     {% for row in boards %}
                     <tr>
-                        <td>{{ row.board_code }}</td>
-                        <td>{{ row.board_name }}</td>
-                        <td>{{ row.pct_chg if row.pct_chg is defined else "-" }}</td>
-                        <td>{{ row.amount if row.amount is defined else "-" }}</td>
+                        <td>{{ row.board_code if row.board_code is defined and row.board_code is not none else "-" }}</td>
+                        <td>{{ row.board_name if row.board_name is defined and row.board_name is not none else "-" }}</td>
+                        <td>{{ row.pct_chg if row.pct_chg is defined and row.pct_chg is not none else "-" }}</td>
+                        <td>{{ row.amount if row.amount is defined and row.amount is not none else "-" }}</td>
                     </tr>
                     {% else %}
                     <tr>
@@ -45,7 +75,7 @@
         </div>
     </div>
 
-    <div class="col-lg-6 mb-4">
+    <div class="col-lg-4 mb-4">
         <h2 class="h5 mb-3">资金流</h2>
         <div class="table-responsive">
             <table class="table table-sm table-hover">
@@ -60,10 +90,10 @@
                 <tbody>
                     {% for row in flows %}
                     <tr>
-                        <td>{{ row.board_name }}</td>
-                        <td>{{ row.net_inflow if row.net_inflow is defined else "-" }}</td>
-                        <td>{{ row.main_net_inflow if row.main_net_inflow is defined else "-" }}</td>
-                        <td>{{ row.source }}</td>
+                        <td>{{ row.board_name if row.board_name is defined and row.board_name is not none else "-" }}</td>
+                        <td>{{ row.net_inflow if row.net_inflow is defined and row.net_inflow is not none else "-" }}</td>
+                        <td>{{ row.main_net_inflow if row.main_net_inflow is defined and row.main_net_inflow is not none else "-" }}</td>
+                        <td>{{ row.source if row.source is defined and row.source is not none else "-" }}</td>
                     </tr>
                     {% else %}
                     <tr>

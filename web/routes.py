@@ -1,6 +1,9 @@
+import math
 import os
+import re
 import sys
 import threading
+import time
 import uuid
 from datetime import date, datetime
 from typing import Any, Dict
@@ -18,7 +21,20 @@ from src.qsss.data.manager import data_manager  # noqa: E402
 # 简单的内存级全市场分析任务管理（避免依赖 Redis/Celery 也能展示进度和日志）
 _market_jobs_lock = threading.Lock()
 _market_jobs: Dict[str, Dict[str, Any]] = {}
+_boards_cache_lock = threading.Lock()
+_boards_cache: Dict[str, Dict[str, Any]] = {}
+CELERY_TASK_ID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+)
+INDEX_SYMBOLS = ["000001", "399001", "399006"]
+DEFAULT_WATCHLIST_SYMBOLS = ["600519", "300750", "601318", "000651", "600036"]
 AI_TECH_SYMBOLS = ["300033", "000977", "603986", "688256", "300308"]
+BOARD_CACHE_TTL_SECONDS = 60
+BOARD_TABLE_LIMIT = 50
+PUBLIC_DATA_SOURCE_ERROR = "数据源请求失败，请查看服务端日志。"
+PUBLIC_ANALYSIS_ERROR = "分析失败，请查看服务端日志。"
+PUBLIC_BACKTEST_ERROR = "回测失败，请查看服务端日志。"
 
 
 @app.route("/")
@@ -120,14 +136,24 @@ def analysis() -> str:
 
 @app.route("/market")
 def market_overview() -> str:
-    """行情总览页面，展示数据源返回的股票和实时行情。"""
-    rows = []
+    """行情总览页面，展示指数和默认自选池实时行情。"""
+    index_rows = []
+    watchlist_rows = []
     error = None
     try:
-        rows = _records(data_manager.get_realtime_data(AI_TECH_SYMBOLS))
+        index_rows = _records(data_manager.get_realtime_data(INDEX_SYMBOLS))
+        watchlist_rows = _records(data_manager.get_realtime_data(DEFAULT_WATCHLIST_SYMBOLS))
     except Exception as exc:
-        error = str(exc)
-    return render_template("market.html", rows=rows, error=error)
+        app.logger.exception("行情总览数据源请求失败: %s", exc)
+        error = PUBLIC_DATA_SOURCE_ERROR
+    return render_template(
+        "market.html",
+        index_symbols=INDEX_SYMBOLS,
+        watchlist_symbols=DEFAULT_WATCHLIST_SYMBOLS,
+        index_rows=index_rows,
+        watchlist_rows=watchlist_rows,
+        error=error,
+    )
 
 
 @app.route("/boards")
@@ -135,13 +161,23 @@ def board_rotation() -> str:
     """板块轮动页面，展示 AKShare 板块和资金流。"""
     boards = []
     flows = []
+    strength_rows = []
     error = None
     try:
-        boards = _records(data_manager.get_boards(board_type="concept"))
-        flows = _records(data_manager.get_board_flows(board_type="concept"))
+        payload = _get_board_rotation_payload()
+        boards = payload["boards"]
+        flows = payload["flows"]
+        strength_rows = payload["strength_rows"]
     except Exception as exc:
-        error = str(exc)
-    return render_template("boards.html", boards=boards, flows=flows, error=error)
+        app.logger.exception("板块轮动数据源请求失败: %s", exc)
+        error = PUBLIC_DATA_SOURCE_ERROR
+    return render_template(
+        "boards.html",
+        boards=boards,
+        flows=flows,
+        strength_rows=strength_rows,
+        error=error,
+    )
 
 
 @app.route("/watchlists/ai-tech")
@@ -152,7 +188,8 @@ def ai_tech_watchlist() -> str:
     try:
         rows = _records(data_manager.get_realtime_data(AI_TECH_SYMBOLS))
     except Exception as exc:
-        error = str(exc)
+        app.logger.exception("AI 科技观察池数据源请求失败: %s", exc)
+        error = PUBLIC_DATA_SOURCE_ERROR
     return render_template(
         "ai_watchlist.html",
         symbols=AI_TECH_SYMBOLS,
@@ -166,6 +203,69 @@ def _records(frame: Any) -> list[dict[str, Any]]:
         return []
     records = frame.to_dict("records")
     return [dict(row) for row in records]
+
+
+def _get_board_rotation_payload() -> dict[str, list[dict[str, Any]]]:
+    cache_key = "concept"
+    now = time.monotonic()
+    with _boards_cache_lock:
+        cached = _boards_cache.get(cache_key)
+        if cached and now - cached["created_at"] <= BOARD_CACHE_TTL_SECONDS:
+            return cached["payload"]
+        boards = _records(data_manager.get_boards(board_type="concept"))[
+            :BOARD_TABLE_LIMIT
+        ]
+        flows = _records(data_manager.get_board_flows(board_type="concept"))[
+            :BOARD_TABLE_LIMIT
+        ]
+        payload = {
+            "boards": boards,
+            "flows": flows,
+            "strength_rows": _build_board_strength_rows(boards, flows),
+        }
+        _boards_cache[cache_key] = {"created_at": now, "payload": payload}
+        return payload
+
+
+def _build_board_strength_rows(
+    boards: list[dict[str, Any]], flows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    flow_by_code = {row.get("board_code"): row for row in flows if row.get("board_code")}
+    rows = []
+    for board in boards:
+        board_code = board.get("board_code")
+        flow = flow_by_code.get(board_code, {})
+        pct_chg = _to_float_or_zero(board.get("pct_chg"))
+        net_inflow = _to_float_or_zero(flow.get("net_inflow"))
+        amount = _to_float_or_zero(board.get("amount"))
+        strength = pct_chg * 0.6 + _scaled_flow_score(net_inflow, amount) * 0.4
+        rows.append(
+            {
+                "board_code": board_code,
+                "board_name": board.get("board_name"),
+                "pct_chg": pct_chg,
+                "net_inflow": net_inflow,
+                "strength": round(strength, 2),
+                "source": board.get("source") or flow.get("source") or "-",
+            }
+        )
+    return sorted(rows, key=lambda row: row["strength"], reverse=True)[:20]
+
+
+def _to_float_or_zero(value: Any) -> float:
+    try:
+        if value is None:
+            return 0.0
+        number = float(value)
+        return number if math.isfinite(number) else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _scaled_flow_score(net_inflow: float, amount: float) -> float:
+    if amount <= 0:
+        return 0.0
+    return max(-10.0, min(10.0, net_inflow / amount * 100.0))
 
 
 @app.route("/api/analyze", methods=["POST"])
@@ -195,7 +295,8 @@ def analyze_stock() -> Any:
         )
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.exception("提交单股分析任务失败: %s", e)
+        return jsonify({"error": PUBLIC_ANALYSIS_ERROR}), 500
 
 
 @app.route("/api/analyze_market", methods=["POST"])
@@ -263,6 +364,28 @@ def get_market_status(job_id: str) -> Any:
     return jsonify(data)
 
 
+@app.route("/api/task/<task_id>")
+def get_task_status(task_id: str) -> Any:
+    """查询 Celery 异步任务状态。"""
+    if not CELERY_TASK_ID_PATTERN.fullmatch(task_id):
+        return jsonify({"error": "任务 ID 格式无效"}), 400
+    task = celery.AsyncResult(task_id)
+    if task.state == "PENDING":
+        return jsonify({"state": task.state, "status": "任务等待执行"})
+    if task.state == "PROGRESS":
+        meta = task.info if isinstance(task.info, dict) else {}
+        return jsonify({"state": task.state, "status": meta.get("status", "正在处理")})
+    if task.state == "SUCCESS":
+        result = task.result
+        if isinstance(result, dict) and result.get("error"):
+            return jsonify({"state": "FAILURE", "error": result["error"]})
+        return jsonify({"state": task.state, "result": result})
+    if task.state == "FAILURE":
+        app.logger.error("Celery 任务失败: task_id=%s info=%s", task_id, task.info)
+        return jsonify({"state": task.state, "error": PUBLIC_ANALYSIS_ERROR})
+    return jsonify({"state": task.state, "status": str(task.info or task.state)})
+
+
 @celery.task(bind=True)
 def perform_analysis(self: Any, stock_code: str, strategy_type: str) -> dict:
     """异步执行单只股票分析（使用当前 QuantStrategy 和 data_manager）"""
@@ -281,9 +404,8 @@ def perform_analysis(self: Any, stock_code: str, strategy_type: str) -> dict:
                     if not row.empty:
                         stock_name = row.iloc[0]["name"]
                         stock_market = row.iloc[0]["market"]
-            except Exception:
-                # 获取股票列表失败时使用默认名称和市场
-                pass
+            except Exception as e:
+                app.logger.warning("获取股票元数据失败，使用股票代码作为名称: %s", e)
 
             stock = Stock(code=stock_code, name=stock_name, market=stock_market)
             db.session.add(stock)
@@ -348,7 +470,7 @@ def perform_analysis(self: Any, stock_code: str, strategy_type: str) -> dict:
         def _to_float_safe(value: Any) -> float | None:
             try:
                 return float(value) if value is not None else None
-            except Exception:
+            except (TypeError, ValueError):
                 return None
 
         return {
@@ -366,7 +488,8 @@ def perform_analysis(self: Any, stock_code: str, strategy_type: str) -> dict:
 
     except Exception as e:
         db.session.rollback()
-        return {"error": str(e)}
+        app.logger.exception("单股分析任务执行失败: %s", e)
+        return {"error": PUBLIC_ANALYSIS_ERROR}
 
 
 def _update_market_job(
@@ -434,8 +557,8 @@ def _market_analysis_worker(job_id: str, limit: int) -> None:
             _update_market_job(
                 job_id,
                 state="FAILURE",
-                error=str(result.get("error")),
-                log=f"任务失败: {result.get('error')}",
+                error=PUBLIC_ANALYSIS_ERROR,
+                log="任务失败，请查看服务端日志。",
             )
         else:
             _update_market_job(
@@ -470,7 +593,7 @@ def _run_market_analysis_core(
         def _to_float_safe(value: Any) -> float | None:
             try:
                 return float(value) if value is not None else None
-            except Exception:
+            except (TypeError, ValueError):
                 return None
 
         for _, row in selected_df.iterrows():
@@ -540,7 +663,8 @@ def _run_market_analysis_core(
 
     except Exception as e:
         db.session.rollback()
-        return {"error": str(e)}
+        app.logger.exception("全市场分析任务执行失败: %s", e)
+        return {"error": PUBLIC_ANALYSIS_ERROR}
 
 
 @celery.task(bind=True)
@@ -554,4 +678,4 @@ def perform_market_analysis(self: Any, limit: int = 50) -> dict:
 def perform_backtest(self: Any, backtest_id: int) -> dict:
     """异步执行回测（占位实现，当前版本未提供具体回测逻辑）"""
     # 直接返回错误信息，避免误用旧接口
-    return {"error": "回测功能尚未实现，当前版本仅支持选股分析"}
+    return {"error": PUBLIC_BACKTEST_ERROR}

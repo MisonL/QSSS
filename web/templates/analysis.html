@@ -21,7 +21,7 @@
                             <label for="stock-code" class="form-label fw-medium text-muted">股票代码</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-upc-scan"></i></span>
-                                <input type="text" class="form-control border-start-0 ps-0" id="stock-code" 
+                                <input type="text" class="form-control border-start-0 ps-0" id="stock-code"
                                        placeholder="例如: 000001" required maxlength="6" pattern="\d{6}">
                             </div>
                             <div class="form-text ms-1">请输入6位数字股票代码</div>
@@ -35,7 +35,7 @@
                             </select>
                         </div>
                     </div>
-                    
+
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-search me-2"></i> 开始深度分析
@@ -44,7 +44,7 @@
                 </form>
             </div>
         </div>
-        
+
         <!-- 分析结果 -->
         <div class="card mt-4 border-0 shadow-sm" id="analysis-result" style="display: none;">
             <div class="card-header bg-success bg-opacity-10 py-3 border-bottom-0">
@@ -57,7 +57,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-transparent border-bottom border-light py-3">
@@ -68,19 +68,19 @@
                     <h6 class="fw-bold text-dark">技术分析</h6>
                     <p class="small text-muted mb-0">基于传统的RSI、MACD、布林带等技术指标，结合均线系统进行趋势判断。</p>
                 </div>
-                
+
                 <div class="mb-4">
                     <h6 class="fw-bold text-dark">机器学习</h6>
                     <p class="small text-muted mb-0">使用 LightGBM 梯度提升树模型，基于历史量价特征预测未来 5 日的上涨概率。</p>
                 </div>
-                
+
                 <div>
                     <h6 class="fw-bold text-dark">短线爆发</h6>
                     <p class="small text-muted mb-0">专注于捕捉短线异动，结合成交量放大、资金流入和价格突破形态识别爆发点。</p>
                 </div>
             </div>
         </div>
-        
+
         <!-- 最近分析占位符，实际功能待后端支持 -->
     </div>
 </div>
@@ -95,8 +95,9 @@
             </div>
             <div class="modal-body">
                 <div class="progress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                         role="progressbar" style="width: 0%" id="progress-bar">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                         style="width: 0%" id="progress-bar">
                         0%
                     </div>
                 </div>
@@ -109,22 +110,24 @@
 
 {% block extra_js %}
 <script>
+const ANALYSIS_ERROR_MESSAGE = '分析失败，请查看服务端日志。';
+
 // 表单提交
 document.getElementById('analysis-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const stockCode = document.getElementById('stock-code').value.trim();
     const strategyType = document.getElementById('strategy-type').value;
-    
+
     if (!stockCode) {
         alert('请输入股票代码');
         return;
     }
-    
+
     // 显示进度模态框
     const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
     progressModal.show();
-    
+
     // 提交分析任务
     fetch('/api/analyze', {
         method: 'POST',
@@ -139,7 +142,7 @@ document.getElementById('analysis-form').addEventListener('submit', function(e) 
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            alert('错误: ' + data.error);
+            alert(ANALYSIS_ERROR_MESSAGE);
             progressModal.hide();
         } else {
             // 开始轮询任务状态
@@ -164,16 +167,25 @@ function pollTaskStatus(taskId, modal) {
                     displayAnalysisResult(data.result);
                 } else if (data.state === 'FAILURE') {
                     modal.hide();
-                    alert('分析失败: ' + (data.error || '未知错误'));
+                    alert(ANALYSIS_ERROR_MESSAGE);
                 } else {
                     // 更新进度
                     const progressBar = document.getElementById('progress-bar');
                     const progressStatus = document.getElementById('progress-status');
-                    
+                    const rawProgress = Number(data.progress);
+                    const progress = Number.isFinite(rawProgress)
+                        ? Math.max(0, Math.min(100, rawProgress))
+                        : null;
+
                     if (data.status) {
                         progressStatus.textContent = data.status;
                     }
-                    
+                    if (progress !== null) {
+                        progressBar.style.width = progress + '%';
+                        progressBar.setAttribute('aria-valuenow', String(progress));
+                        progressBar.textContent = progress.toFixed(0) + '%';
+                    }
+
                     setTimeout(checkStatus, 1000);
                 }
             })
@@ -183,7 +195,7 @@ function pollTaskStatus(taskId, modal) {
                 alert('获取任务状态失败');
             });
     };
-    
+
     checkStatus();
 }
 
@@ -191,26 +203,26 @@ function pollTaskStatus(taskId, modal) {
 function displayAnalysisResult(result) {
     const resultDiv = document.getElementById('analysis-result');
     const contentDiv = document.getElementById('result-content');
-    
+
     if (result.error) {
         contentDiv.innerHTML = `
             <div class="alert alert-danger border-0 d-flex align-items-center">
                 <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
                 <div>
                     <strong>分析失败</strong><br>
-                    ${result.error}
+                    ${ANALYSIS_ERROR_MESSAGE}
                 </div>
             </div>
         `;
     } else {
         const scoreClass = result.total_score > 80 ? 'text-success' : result.total_score > 60 ? 'text-warning' : 'text-danger';
-        
+
         let badgeClass = 'secondary';
         let badgeText = '待定';
         if (result.recommendation === 'buy') { badgeClass = 'success'; badgeText = '强烈推荐买入'; }
         else if (result.recommendation === 'hold') { badgeClass = 'warning'; badgeText = '建议观望持有'; }
         else if (result.recommendation === 'sell') { badgeClass = 'danger'; badgeText = '建议立即卖出'; }
-        
+
         contentDiv.innerHTML = `
             <div class="row text-center mb-5">
                 <div class="col-md-6 border-end">
@@ -227,7 +239,7 @@ function displayAnalysisResult(result) {
                     </span>
                 </div>
             </div>
-            
+
             <div class="bg-light rounded p-4">
                 <h6 class="fw-bold border-bottom pb-2 mb-3 text-primary"><i class="bi bi-activity me-2"></i>核心指标分析</h6>
                 <div class="row g-4">
@@ -275,7 +287,7 @@ function displayAnalysisResult(result) {
             </div>
         `;
     }
-    
+
     resultDiv.style.display = 'block';
     resultDiv.scrollIntoView({ behavior: 'smooth' });
 }

@@ -28,11 +28,11 @@
         <tbody>
             {% for row in rows %}
             <tr>
-                <td>{{ row.symbol }}</td>
-                <td>{{ row.name }}</td>
-                <td>{{ row.price if row.price is defined else "-" }}</td>
-                <td>{{ row.pct_chg if row.pct_chg is defined else "-" }}</td>
-                <td>{{ row.source if row.source is defined else "-" }}</td>
+                <td>{{ row.symbol if row.symbol is defined and row.symbol is not none else "-" }}</td>
+                <td>{{ row.name if row.name is defined and row.name is not none else "-" }}</td>
+                <td>{{ row.price if row.price is defined and row.price is not none else "-" }}</td>
+                <td>{{ row.pct_chg if row.pct_chg is defined and row.pct_chg is not none else "-" }}</td>
+                <td>{{ row.source if row.source is defined and row.source is not none else "-" }}</td>
             </tr>
             {% else %}
             <tr>

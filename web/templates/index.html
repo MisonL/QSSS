@@ -18,7 +18,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-3 mb-4">
         <div class="card stat-card bg-success h-100">
             <div class="card-body">
@@ -34,7 +34,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-3 mb-4">
         <div class="card stat-card bg-info h-100">
             <div class="card-body">
@@ -50,7 +50,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-3 mb-4">
         <div class="card stat-card bg-warning h-100">
             <div class="card-body">
@@ -91,7 +91,7 @@
                     <div class="mb-4">
                         <label for="stock-limit" class="form-label fw-bold text-muted small text-uppercase">选股数量</label>
                         <div class="input-group">
-                            <input type="number" class="form-control form-control-lg" id="stock-limit" 
+                            <input type="number" class="form-control form-control-lg" id="stock-limit"
                                    min="10" max="200" step="10" value="50">
                             <span class="input-group-text bg-light text-muted">只</span>
                         </div>
@@ -106,7 +106,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- 最新分析结果 -->
     <div class="col-md-6 mb-4">
         <div class="card h-100">
@@ -193,17 +193,17 @@
             <p id="analysis-progress-detail" class="text-muted mb-4">
                 正在连接数据源并获取股票列表
             </p>
-            
+
             <div class="progress mb-3" style="height: 0.8rem; border-radius: 1rem;">
                 <div id="market-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%;">
                 </div>
             </div>
-            
+
             <div class="d-flex justify-content-between small text-muted mb-4 px-1">
                 <span id="market-progress-text">准备中...</span>
                 <span id="market-progress-status">0%</span>
             </div>
-            
+
             <div class="card bg-light border-0 text-start">
                 <div class="card-header bg-transparent border-bottom border-light py-2">
                     <small class="fw-bold text-uppercase text-muted">执行日志</small>
@@ -221,6 +221,21 @@
 <script>
 let marketStatusPollTimer = null;
 let currentMarketJobId = null;
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderAlert(container, message, prefix = '') {
+    container.innerHTML = '<div class="alert alert-danger">' +
+        escapeHtml(prefix + String(message || '未知错误')) +
+        '</div>';
+}
 
 const marketForm = document.getElementById('market-analysis-form');
 if (marketForm) {
@@ -275,13 +290,11 @@ if (marketForm) {
                 currentMarketJobId = data.job_id;
                 startMarketStatusPolling(currentMarketJobId);
             } else {
-                content.innerHTML =
-                    '<div class="alert alert-danger">' + (data.error || '无法创建分析任务') + '</div>';
+                renderAlert(content, data && data.error ? data.error : '无法创建分析任务');
             }
         })
         .catch(error => {
-            content.innerHTML =
-                '<div class="alert alert-danger">请求失败: ' + error.message + '</div>';
+            renderAlert(content, error.message, '请求失败: ');
         });
     });
 }
@@ -317,7 +330,7 @@ function startMarketStatusPolling(jobId) {
                 const logContainer = content.querySelector('#market-log-container');
 
                 if (data.error && !data.state) {
-                    content.innerHTML = '<div class="alert alert-danger">' + (data.error || '任务查询失败') + '</div>';
+                    renderAlert(content, data.error || '任务查询失败');
                     return;
                 }
 
@@ -358,7 +371,7 @@ function startMarketStatusPolling(jobId) {
                 if (data.state === 'SUCCESS' && data.result) {
                     displayMarketAnalysisResult(data.result);
                 } else if (data.state === 'FAILURE') {
-                    content.innerHTML = '<div class="alert alert-danger">分析失败: ' + (data.error || '未知错误') + '</div>';
+                    renderAlert(content, data.error || '未知错误', '分析失败: ');
                 } else {
                     marketStatusPollTimer = setTimeout(poll, 1000);
                 }
@@ -366,8 +379,7 @@ function startMarketStatusPolling(jobId) {
             .catch(error => {
                 const content = document.getElementById('analysis-result-content');
                 if (content) {
-                    content.innerHTML =
-                        '<div class="alert alert-danger">获取任务状态失败: ' + error.message + '</div>';
+                    renderAlert(content, error.message, '获取任务状态失败: ');
                 }
             });
     };
@@ -385,8 +397,7 @@ function displayMarketAnalysisResult(result) {
     }
 
     if (!result || result.error) {
-        content.innerHTML =
-            '<div class="alert alert-danger">' + (result && result.error ? result.error : '未返回有效结果') + '</div>';
+        renderAlert(content, result && result.error ? result.error : '未返回有效结果');
         return;
     }
 
@@ -398,7 +409,7 @@ function displayMarketAnalysisResult(result) {
 
     let html = '<div class="p-4">';
     html += '<div class="alert alert-success border-0 bg-success bg-opacity-10 text-success mb-4 d-flex align-items-center"><i class="bi bi-check-circle-fill me-2"></i><div><strong>分析完成！</strong> 共选出 ' + (result.count || items.length) + ' 只优质股票</div></div>';
-    
+
     html += '<div class="table-responsive rounded border"><table class="table table-hover align-middle mb-0">';
     html += '<thead class="bg-light"><tr><th>代码</th><th>名称</th><th>市场</th><th>综合评分</th><th>推荐</th><th>上涨概率</th><th>动量</th><th>爆发力</th><th>波动率</th></tr></thead><tbody>';
 
@@ -416,9 +427,9 @@ function displayMarketAnalysisResult(result) {
         else if (item.recommendation === 'sell') { badgeClass = 'danger'; badgeText = '卖出'; }
 
         html += '<tr>' +
-            '<td><span class="font-monospace text-muted">' + (item.stock_code || '') + '</span></td>' +
-            '<td class="fw-bold">' + (item.stock_name || '') + '</td>' +
-            '<td><span class="badge bg-light text-dark border">' + (item.market || '') + '</span></td>' +
+            '<td><span class="font-monospace text-muted">' + escapeHtml(item.stock_code || '') + '</span></td>' +
+            '<td class="fw-bold">' + escapeHtml(item.stock_name || '') + '</td>' +
+            '<td><span class="badge bg-light text-dark border">' + escapeHtml(item.market || '') + '</span></td>' +
             '<td><span class="fw-bold text-primary">' + score + '</span></td>' +
             '<td><span class="badge bg-' + badgeClass + ' bg-opacity-10 text-' + badgeClass + ' px-3 py-2 rounded-pill">' + badgeText + '</span></td>' +
             '<td>' + prediction + '</td>' +

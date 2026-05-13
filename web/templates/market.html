@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h1 class="h3 mb-1">行情总览</h1>
-        <p class="text-muted mb-0">来自当前 DataManager 的股票或实时行情数据。</p>
+        <p class="text-muted mb-0">指数池和默认自选池实时行情。</p>
     </div>
 </div>
 
@@ -14,34 +14,67 @@
 <div class="alert alert-danger">数据源错误: {{ error }}</div>
 {% endif %}
 
-<div class="table-responsive">
-    <table class="table table-hover align-middle">
-        <thead>
-            <tr>
-                <th>代码</th>
-                <th>名称</th>
-                <th>市场</th>
-                <th>最新价</th>
-                <th>涨跌幅</th>
-                <th>来源</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in rows %}
-            <tr>
-                <td>{{ row.symbol }}</td>
-                <td>{{ row.name }}</td>
-                <td>{{ row.market or "-" }}</td>
-                <td>{{ row.price if row.price is defined else "-" }}</td>
-                <td>{{ row.pct_chg if row.pct_chg is defined else "-" }}</td>
-                <td>{{ row.source if row.source is defined else "-" }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="6" class="text-muted">暂无真实行情数据。</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="row">
+    <div class="col-lg-5 mb-4">
+        <h2 class="h5 mb-3">指数行情</h2>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>最新价</th>
+                        <th>来源</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in index_rows|default([]) %}
+                    <tr>
+                        <td>{{ row.symbol if row.symbol is defined and row.symbol is not none else "-" }}</td>
+                        <td>{{ row.name if row.name is defined and row.name is not none else "-" }}</td>
+                        <td>{{ row.price if row.price is defined and row.price is not none else "-" }}</td>
+                        <td>{{ row.source if row.source is defined and row.source is not none else "-" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-muted">暂无真实指数行情数据。指数池: {{ index_symbols|default([])|join(", ") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-lg-7 mb-4">
+        <h2 class="h5 mb-3">默认自选池</h2>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>最新价</th>
+                        <th>涨跌幅</th>
+                        <th>来源</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in watchlist_rows|default([]) %}
+                    <tr>
+                        <td>{{ row.symbol if row.symbol is defined and row.symbol is not none else "-" }}</td>
+                        <td>{{ row.name if row.name is defined and row.name is not none else "-" }}</td>
+                        <td>{{ row.price if row.price is defined and row.price is not none else "-" }}</td>
+                        <td>{{ row.pct_chg if row.pct_chg is defined and row.pct_chg is not none else "-" }}</td>
+                        <td>{{ row.source if row.source is defined and row.source is not none else "-" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-muted">暂无真实自选池行情数据。自选池: {{ watchlist_symbols|default([])|join(", ") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}

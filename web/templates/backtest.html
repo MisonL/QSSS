@@ -20,7 +20,7 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="stock-code" class="form-label fw-medium text-muted">股票代码</label>
-                                <input type="text" class="form-control" id="stock-code" 
+                                <input type="text" class="form-control" id="stock-code"
                                        placeholder="例如: 000001" required maxlength="6" pattern="\d{6}">
                             </div>
                         </div>
@@ -36,7 +36,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -51,16 +51,16 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-4">
                         <label for="initial-capital" class="form-label fw-medium text-muted">初始资金 (CNY)</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light border-end-0">CNY </span>
-                            <input type="number" class="form-control border-start-0 ps-2" id="initial-capital" 
+                            <input type="number" class="form-control border-start-0 ps-2" id="initial-capital"
                                    value="100000" min="1000" step="1000" required>
                         </div>
                     </div>
-                    
+
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-rocket-takeoff me-2"></i> 开始回测
@@ -69,7 +69,7 @@
                 </form>
             </div>
         </div>
-        
+
         <!-- 回测结果 -->
         <div class="card mt-4 border-0 shadow-sm" id="backtest-result" style="display: none;">
             <div class="card-header bg-info bg-opacity-10 py-3 border-bottom-0">
@@ -82,7 +82,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-lg-4">
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-transparent border-bottom border-light py-3">
@@ -98,7 +98,7 @@
                         <li class="ms-2"><strong>初始资金:</strong> 虚拟账户起始金额</li>
                     </ul>
                 </div>
-                
+
                 <div>
                     <h6 class="fw-bold text-dark">关键指标</h6>
                     <ul class="list-unstyled mb-0 ps-2 border-start border-2 border-light">
@@ -109,7 +109,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-transparent border-bottom border-light py-3">
                 <h5 class="card-title mb-0 fw-bold"><i class="bi bi-clock-history me-2 text-muted"></i>最近回测</h5>
@@ -134,8 +134,9 @@
             </div>
             <div class="modal-body">
                 <div class="progress">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                         role="progressbar" style="width: 0%" id="progress-bar">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                         style="width: 0%" id="progress-bar">
                         0%
                     </div>
                 </div>
@@ -148,6 +149,8 @@
 
 {% block extra_js %}
 <script>
+const BACKTEST_ERROR_MESSAGE = '回测失败，请查看服务端日志。';
+
 // 设置默认日期
 const today = new Date();
 const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
@@ -158,7 +161,7 @@ document.getElementById('start-date').value = oneYearAgo.toISOString().split('T'
 // 表单提交
 document.getElementById('backtest-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const formData = {
         stock_code: document.getElementById('stock-code').value.trim(),
         strategy_id: parseInt(document.getElementById('strategy-id').value),
@@ -166,21 +169,21 @@ document.getElementById('backtest-form').addEventListener('submit', function(e) 
         end_date: document.getElementById('end-date').value,
         initial_capital: parseFloat(document.getElementById('initial-capital').value)
     };
-    
+
     if (!formData.stock_code || !formData.strategy_id || !formData.start_date || !formData.end_date) {
         alert('请填写完整信息');
         return;
     }
-    
+
     if (new Date(formData.start_date) >= new Date(formData.end_date)) {
         alert('开始日期必须早于结束日期');
         return;
     }
-    
+
     // 显示进度模态框
     const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
     progressModal.show();
-    
+
     // 提交回测任务
     fetch('/api/backtest', {
         method: 'POST',
@@ -192,7 +195,7 @@ document.getElementById('backtest-form').addEventListener('submit', function(e) 
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            alert('错误: ' + data.error);
+            alert(BACKTEST_ERROR_MESSAGE);
             progressModal.hide();
         } else {
             // 开始轮询任务状态
@@ -217,16 +220,25 @@ function pollTaskStatus(taskId, modal) {
                     displayBacktestResult(data.result);
                 } else if (data.state === 'FAILURE') {
                     modal.hide();
-                    alert('回测失败: ' + (data.error || '未知错误'));
+                    alert(BACKTEST_ERROR_MESSAGE);
                 } else {
                     // 更新进度
                     const progressBar = document.getElementById('progress-bar');
                     const progressStatus = document.getElementById('progress-status');
-                    
+                    const rawProgress = Number(data.progress);
+                    const progress = Number.isFinite(rawProgress)
+                        ? Math.max(0, Math.min(100, rawProgress))
+                        : null;
+
                     if (data.status) {
                         progressStatus.textContent = data.status;
                     }
-                    
+                    if (progress !== null) {
+                        progressBar.style.width = progress + '%';
+                        progressBar.setAttribute('aria-valuenow', String(progress));
+                        progressBar.textContent = progress.toFixed(0) + '%';
+                    }
+
                     setTimeout(checkStatus, 1000);
                 }
             })
@@ -236,7 +248,7 @@ function pollTaskStatus(taskId, modal) {
                 alert('获取任务状态失败');
             });
     };
-    
+
     checkStatus();
 }
 
@@ -244,21 +256,21 @@ function pollTaskStatus(taskId, modal) {
 function displayBacktestResult(result) {
     const resultDiv = document.getElementById('backtest-result');
     const contentDiv = document.getElementById('result-content');
-    
+
     if (result.error) {
         contentDiv.innerHTML = `
             <div class="alert alert-danger border-0 d-flex align-items-center">
                 <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
                 <div>
                     <strong>回测失败</strong><br>
-                    ${result.error}
+                    ${BACKTEST_ERROR_MESSAGE}
                 </div>
             </div>
         `;
     } else {
         const returnClass = result.total_return > 0 ? 'text-success' : 'text-danger';
         const annualClass = result.annual_return > 0 ? 'text-success' : 'text-danger';
-        
+
         contentDiv.innerHTML = `
             <div class="row g-4 mb-4">
                 <div class="col-md-3">
@@ -294,7 +306,7 @@ function displayBacktestResult(result) {
                     </div>
                 </div>
             </div>
-            
+
             <div class="bg-light rounded p-4">
                 <h6 class="fw-bold border-bottom pb-2 mb-3 text-info"><i class="bi bi-pie-chart me-2"></i>详细统计</h6>
                 <div class="row g-4">
@@ -348,7 +360,7 @@ function displayBacktestResult(result) {
                     </div>
                 </div>
             </div>
-            
+
             {# 回测结果列表页面尚未实现，按钮暂时注释掉以避免路由错误 #}
             {#
             <div class="mt-4 text-center">
@@ -359,7 +371,7 @@ function displayBacktestResult(result) {
             #}
         `;
     }
-    
+
     resultDiv.style.display = 'block';
     resultDiv.scrollIntoView({ behavior: 'smooth' });
 }
