@@ -24,6 +24,8 @@ from typing import Any, Dict, List, Optional
 import psutil
 from loguru import logger
 
+PUBLIC_CLUSTER_STATUS_ERROR = "获取集群状态失败，请查看日志。"
+
 
 class TaskScheduler:
     """分布式任务调度器"""
@@ -48,10 +50,7 @@ class TaskScheduler:
             except redis.ConnectionError:
                 logger.warning("Redis连接失败，使用内存任务队列")
                 self.redis_client = None
-        elif self.redis_client is not None:
-            # 外部传入 redis_client
-            pass
-        else:
+        elif self.redis_client is None:
             self.redis_client = None
 
         # 初始化Celery
@@ -279,7 +278,7 @@ class TaskScheduler:
 
         except Exception as e:
             logger.error(f"获取集群状态失败: {e}")
-            return {"error": str(e)}
+            return {"error": PUBLIC_CLUSTER_STATUS_ERROR}
 
     def cleanup_completed_tasks(self, max_age_hours: int = 24) -> int:
         """清理完成的任务"""

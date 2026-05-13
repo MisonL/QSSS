@@ -2,12 +2,14 @@
 
 from typing import Optional
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """系统配置类"""
+
+    model_config = ConfigDict(env_file=".env", env_prefix="QSSS_")
 
     # 数据源配置 - 支持 pytdx / tushare / baostock
     # 通过环境变量 QSSS_PRIMARY_DATA_SOURCE / QSSS_BACKUP_DATA_SOURCE 覆盖
@@ -86,10 +88,6 @@ class Settings(BaseSettings):
     ths_industry_path: str = Field(
         default="", description="同花顺 block_industry.ini 本地路径"
     )
-
-    class Config:
-        env_file = ".env"
-        env_prefix = "QSSS_"
 
 
 # 全局配置实例

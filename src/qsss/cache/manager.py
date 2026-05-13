@@ -18,6 +18,8 @@ from typing import Any, Callable, Dict, Optional
 
 from loguru import logger
 
+from qsss.cache.errors import CacheDeserializationError
+
 
 class CacheManager:
     """高性能缓存管理器"""
@@ -88,15 +90,19 @@ class CacheManager:
         """反序列化值"""
         try:
             return pickle.loads(value)
-        except Exception:
+        except Exception as pickle_error:
             try:
                 return json.loads(value.decode("utf-8"))
-            except Exception as e:
-                logger.error(f"反序列化失败: {e}")
-                return None
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise CacheDeserializationError(
+                    "缓存反序列化失败，缓存内容可能已损坏"
+                ) from pickle_error
 
     def get(self, key: str, prefix: str = "qsss") -> Optional[Any]:
-        """获取缓存值"""
+        """获取缓存值。
+
+        缓存内容损坏时抛出 CacheDeserializationError；其他取值异常记录日志后返回 None。
+        """
         try:
             cache_key = self._generate_key(key, prefix)
 
@@ -125,7 +131,11 @@ class CacheManager:
                 self._cache_stats["misses"] += 1
             return None
 
+        except CacheDeserializationError:
+            # 损坏缓存必须暴露给调用方处理。
+            raise
         except Exception as e:
+            # 连接等非数据完整性异常保持旧契约，记录后按未命中处理。
             logger.error(f"获取缓存失败: {e}")
             return None
 
@@ -328,7 +338,11 @@ class CacheManager:
                 cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
 
                 # 尝试从缓存获取
-                cached_result = self.get(cache_key, prefix)
+                try:
+                    cached_result = self.get(cache_key, prefix)
+                except CacheDeserializationError as e:
+                    logger.error(f"缓存装饰器读取到损坏缓存，按未命中处理: {e}")
+                    cached_result = None
                 if cached_result is not None:
                     return cached_result
 

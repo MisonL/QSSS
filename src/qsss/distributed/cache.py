@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 
 from loguru import logger
 
+from qsss.cache.errors import CacheDeserializationError
 from ..config.settings import settings
 
 
@@ -42,10 +43,7 @@ class DistributedCache:
             except redis.ConnectionError:
                 logger.warning("Redis连接失败，使用内存缓存")
                 self.redis_client = None
-        elif self.redis_client is not None:
-            # 外部传入的 redis_client 统一视为 Any
-            pass
-        else:
+        elif self.redis_client is None:
             self.redis_client = None
 
     def _generate_key(self, key: str, prefix: str = "qsss") -> str:
@@ -64,12 +62,13 @@ class DistributedCache:
         """反序列化值"""
         try:
             return pickle.loads(value)
-        except Exception:
+        except Exception as pickle_error:
             try:
                 return json.loads(value.decode("utf-8"))
-            except Exception as e:
-                logger.error(f"反序列化失败: {e}")
-                return None
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                raise CacheDeserializationError(
+                    "分布式缓存反序列化失败，缓存内容可能已损坏"
+                ) from pickle_error
 
     def get(self, key: str, prefix: str = "qsss") -> Optional[Any]:
         """获取缓存值"""
@@ -83,6 +82,8 @@ class DistributedCache:
             else:
                 return self._memory_cache.get(cache_key)
 
+        except CacheDeserializationError:
+            raise
         except Exception as e:
             logger.error(f"获取缓存失败: {e}")
 

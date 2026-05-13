@@ -428,13 +428,15 @@ class OptimizedQuantStrategy:
         # 获取性能统计信息
         try:
             performance_stats = self.performance_monitor.stop_monitoring()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"获取性能统计失败: {e}")
             performance_stats = {}
 
         # 获取缓存统计信息
         try:
             cache_stats = self.cache.get_stats() if self.use_cache else {}
-        except Exception:
+        except Exception as e:
+            logger.warning(f"获取缓存统计失败: {e}")
             cache_stats = {}
 
         return {

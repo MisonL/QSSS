@@ -58,6 +58,16 @@ def test_ths_local_parser_missing_path_is_explicit(tmp_path):
         adapter.get_board_members("人工智能", board_type="concept")
 
 
+def test_ths_local_parser_invalid_encoding_is_explicit(tmp_path):
+    """Invalid THS cache encoding should fail with an actionable error."""
+    concept_path = tmp_path / "block_conception.ini"
+    concept_path.write_bytes(b"\xff\xfe\x00broken")
+    adapter = ThsLocalBoardAdapter(conception_path=concept_path)
+
+    with pytest.raises(ValueError, match="无法读取同花顺本地缓存文件"):
+        adapter.get_board_members("人工智能", board_type="concept")
+
+
 def test_data_manager_routes_registered_ths_board_members(tmp_path):
     """DataManager should expose board members through a registered THS adapter."""
     concept_path = tmp_path / "block_conception.ini"

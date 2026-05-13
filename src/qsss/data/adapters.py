@@ -2,7 +2,6 @@
 
 import threading
 import time
-import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,8 +11,6 @@ from loguru import logger
 
 from ..config.settings import settings
 from ..utils.decorators import retry_on_exception
-
-warnings.filterwarnings("ignore")
 
 try:
     from pytdx.hq import TdxHq_API
@@ -34,19 +31,19 @@ class DataAdapter(ABC):
     @abstractmethod
     def get_stock_list(self) -> pd.DataFrame:
         """获取股票列表"""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_daily_data(
         self, symbol: str, start_date: str, end_date: str
     ) -> pd.DataFrame:
         """获取日线数据"""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_realtime_data(self, symbols: List[str]) -> pd.DataFrame:
         """获取实时数据"""
-        pass
+        raise NotImplementedError
 
 
 class PytdxAdapter(DataAdapter):
@@ -179,8 +176,8 @@ class PytdxAdapter(DataAdapter):
                     # 连接池已满，关闭连接
                     try:
                         api.disconnect()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"关闭溢出 pytdx 连接失败: {e}")
 
     def _get_cache_key(self, symbol: str, start_date: str, end_date: str) -> str:
         """生成缓存键"""
@@ -588,8 +585,11 @@ class PytdxAdapter(DataAdapter):
 
     def get_realtime_data(self, symbols: List[str]) -> pd.DataFrame:
         """获取实时行情数据"""
-        self.ensure_connected()
-        try:
+        if not symbols:
+            return pd.DataFrame()
+        result = []
+        for attempt in range(2):
+            self.ensure_connected()
             result = []
             fetched_at = datetime.now().isoformat(timespec="seconds")
             for symbol in symbols:
@@ -617,11 +617,18 @@ class PytdxAdapter(DataAdapter):
                         }
                     )
 
-            return pd.DataFrame(result)
+            if result or attempt == 1:
+                return pd.DataFrame(result)
 
-        except Exception as e:
-            logger.error(f"获取实时数据失败: {e}")
-            return pd.DataFrame()
+            logger.warning("实时行情返回为空，重新连接 pytdx 后重试一次")
+            self._connected = False
+            if self.api:
+                try:
+                    self.api.disconnect()
+                except Exception as e:
+                    logger.warning(f"断开旧 pytdx 连接失败: {e}")
+
+        return pd.DataFrame(result)
 
     def __del__(self) -> None:
         """析构函数，关闭连接"""

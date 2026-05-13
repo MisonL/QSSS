@@ -16,7 +16,7 @@ try:  # pragma: no cover - 缺少 tushare 时的分支在测试中通常不会�
     from .sources.tushare_adapter import TushareAdapter as _TushareAdapter
 
     _HAS_TUSHARE = True
-except Exception:
+except ImportError:
     _TushareAdapter = None  # type: ignore[assignment, misc]
     _HAS_TUSHARE = False
 
@@ -25,7 +25,7 @@ try:  # pragma: no cover
     from .sources.baostock_adapter import BaostockAdapter as _BaostockAdapter
 
     _HAS_BAOSTOCK = True
-except Exception:
+except ImportError:
     _BaostockAdapter = None  # type: ignore[assignment, misc]
     _HAS_BAOSTOCK = False
 

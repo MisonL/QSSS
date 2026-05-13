@@ -9,6 +9,8 @@
 import textwrap
 from pathlib import Path
 
+import pytest
+
 from qsss.scripts.analyze_logs import (
     _parse_filter_datetime,
     analyze_log_file,
@@ -131,10 +133,5 @@ def test_analyze_log_file_since_until_and_source_filter(tmp_path):
 def test_parse_filter_datetime_invalid_format():
     """非法时间格式应抛出 ValueError。"""
 
-    try:
+    with pytest.raises(ValueError):
         _parse_filter_datetime("2025/01/01")
-    except ValueError:
-        # 期望抛出异常
-        pass
-    else:
-        raise AssertionError("_parse_filter_datetime 应该对非法格式抛出 ValueError")

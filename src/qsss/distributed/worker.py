@@ -13,6 +13,10 @@ from loguru import logger
 from ..core.strategy import QuantStrategy
 from .scheduler import TaskScheduler
 
+PUBLIC_BATCH_ERROR = "批次任务处理失败，请查看日志。"
+PUBLIC_WORKER_STATUS_ERROR = "获取工作节点状态失败，请查看日志。"
+PUBLIC_TASK_ERROR = "任务处理失败，请查看日志。"
+
 
 class DistributedWorker:
     """分布式工作节点"""
@@ -92,7 +96,7 @@ class DistributedWorker:
                 "batch_id": batch_id,
                 "results": [],
                 "failed_stocks": stocks,
-                "error": str(e),
+                "error": PUBLIC_BATCH_ERROR,
             }
 
     def _analyze_single_stock(
@@ -136,7 +140,7 @@ class DistributedWorker:
             }
         except Exception as e:
             logger.error(f"获取系统状态失败: {e}")
-            return {"worker_id": self.worker_id, "error": str(e)}
+            return {"worker_id": self.worker_id, "error": PUBLIC_WORKER_STATUS_ERROR}
 
     def _should_accept_task(self) -> bool:
         """判断是否应接受新任务"""
@@ -149,7 +153,8 @@ class DistributedWorker:
                 return False
 
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"检查系统资源失败: {e}")
             return True
 
     def start(self) -> None:
@@ -195,7 +200,7 @@ class DistributedWorker:
                         error = f"不支持的任务类型: {task_type}"
 
                 except Exception as e:
-                    error = str(e)
+                    error = PUBLIC_TASK_ERROR
                     logger.error(f"处理任务 {task_id} 失败: {e}")
 
                 # 更新任务状态和结果
@@ -262,5 +267,5 @@ if hasattr(TaskScheduler, "celery_app") and TaskScheduler.celery_app is not None
 
         except Exception as e:
             logger.error(f"Celery任务处理失败: {e}")
-            self.update_state(state="FAILURE", meta={"error": str(e)})
+            self.update_state(state="FAILURE", meta={"error": PUBLIC_TASK_ERROR})
             raise

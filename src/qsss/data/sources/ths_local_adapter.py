@@ -74,7 +74,12 @@ class ThsLocalBoardAdapter:
 
 
 def _parse_board_file(path: Path, board_type: str) -> Dict[str, list[BoardMember]]:
-    text = path.read_text(encoding="utf-8-sig", errors="ignore")
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            f"无法读取同花顺本地缓存文件，请确认文件为 UTF-8 编码: {path}"
+        ) from exc
     version = _file_version(path)
     boards: Dict[str, list[BoardMember]] = {}
     current_board = ""

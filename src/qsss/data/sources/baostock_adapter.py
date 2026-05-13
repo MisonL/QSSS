@@ -247,5 +247,5 @@ class BaostockAdapter(DataAdapter):
         if BAOSTOCK_IMPORTED and getattr(self, "_logged_in", False):
             try:
                 bs.logout()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Baostock 登出失败: {e}")

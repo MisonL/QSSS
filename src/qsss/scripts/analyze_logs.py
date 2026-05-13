@@ -149,7 +149,7 @@ def analyze_log_file(
     if sources_filter:
         sources_filter = [s.strip() for s in sources_filter if s.strip()]
 
-    with log_path.open("r", encoding=encoding, errors="ignore") as f:
+    with log_path.open("r", encoding=encoding) as f:
         for line in f:
             event = parse_event_from_line(line)
             if not event:
@@ -198,10 +198,11 @@ def _guess_default_log_file() -> Path:
         log_file = getattr(qsss_settings, "log_file", None)
         if isinstance(log_file, str) and log_file:
             candidates.append(Path(log_file))
-    except Exception:  # pragma: no cover - 配置导入失败时退化为默认路径
-        pass
+    except ImportError:  # pragma: no cover - 单独拷贝脚本运行时可能无包环境
+        candidates.append(Path("logs/qsss.log"))
 
-    candidates.append(Path("logs/qsss.log"))
+    if not candidates:
+        candidates.append(Path("logs/qsss.log"))
 
     # 返回第一个已存在的文件，否则返回第一个候选路径
     for p in candidates:

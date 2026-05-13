@@ -26,6 +26,14 @@ class _FakePytdxApi:
         return None
 
 
+class _FailOnUsePytdxApi:
+    def get_security_quotes(self, securities):
+        raise AssertionError(f"unexpected quote request: {securities}")
+
+    def disconnect(self):
+        raise AssertionError("unexpected disconnect")
+
+
 def test_pytdx_realtime_maps_native_quote_fields():
     """pytdx native quote fields should map to QSSS realtime contract."""
     adapter = PytdxAdapter()
@@ -51,3 +59,15 @@ def test_pytdx_realtime_maps_native_quote_fields():
     assert row["quote_time"] == "2026-05-12 14:30:00"
     assert row["source"] == "pytdx"
     assert isinstance(row["fetched_at"], str)
+
+
+def test_pytdx_realtime_empty_symbols_returns_without_reconnect():
+    adapter = PytdxAdapter()
+    adapter.api = _FailOnUsePytdxApi()
+    adapter._connected = False
+
+    df = adapter.get_realtime_data([])
+
+    assert df.empty
+    assert adapter._connected is False
+    adapter.api = None

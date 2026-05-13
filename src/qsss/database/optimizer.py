@@ -71,9 +71,6 @@ class DatabaseOptimizer:
         # 创建数据库索引
         self._create_indexes()
 
-        # 启用查询缓存
-        self._setup_query_cache()
-
     def _create_indexes(self) -> None:
         """创建数据库索引"""
         if self.app is None:
@@ -136,11 +133,6 @@ class DatabaseOptimizer:
         except Exception as e:
             logger.error(f"创建数据库索引失败: {e}")
             db.session.rollback()
-
-    def _setup_query_cache(self) -> None:
-        """设置查询缓存"""
-        # 这里可以集成Redis缓存
-        pass
 
     @contextmanager
     def timed_query(self, query_name: str) -> Iterator[None]:
@@ -441,8 +433,8 @@ class DatabaseOptimizer:
                 try:
                     db.session.execute(text("VACUUM"))
                     logger.info("数据库VACUUM优化完成")
-                except Exception:
-                    logger.warning("VACUUM优化失败（可能不是SQLite数据库）")
+                except Exception as e:
+                    logger.warning(f"VACUUM优化失败（可能不是SQLite数据库）: {e}")
 
         except Exception as e:
             logger.error(f"数据库清理失败: {e}")

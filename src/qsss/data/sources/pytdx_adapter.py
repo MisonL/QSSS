@@ -220,6 +220,8 @@ class PytdxAdapter:
 
     def get_realtime_data(self, symbols: List[str]) -> pd.DataFrame:
         """获取实时行情数据"""
+        if not symbols:
+            return pd.DataFrame()
         try:
             result = []
             for symbol in symbols:
