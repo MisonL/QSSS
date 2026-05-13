@@ -43,10 +43,10 @@ def main():
 
     print("\n 欢迎使用QSSS交互式量化选股系统！")
     print("\n 系统功能:")
-    print("• AI驱动选股 - LightGBM机器学习预测5日上涨概率")
-    print("• 多因子评分 - 综合上涨概率、动量、爆发潜力、风险控制")
-    print("• 技术指标分析 - RSI、MACD、布林带、成交量综合分析")
-    print("• 智能筛选 - 自动识别优质标的和爆发潜力股")
+    print("- AI驱动选股 - LightGBM机器学习预测5日上涨概率")
+    print("- 多因子评分 - 综合上涨概率、动量、爆发潜力、风险控制")
+    print("- 技术指标分析 - RSI、MACD、布林带、成交量综合分析")
+    print("- 智能筛选 - 自动识别优质标的和爆发潜力股")
 
     print("\n 快速开始:")
     print("1. 直接运行: qsss")
@@ -56,9 +56,9 @@ def main():
     print("5. 查看版本: qsss version")
 
     print("\n  重要提醒:")
-    print("• 首次运行需要连接股票数据源，可能需要一些时间")
-    print("• 分析结果基于历史数据，不构成投资建议")
-    print("• 投资有风险，决策需谨慎")
+    print("- 首次运行需要连接股票数据源，可能需要一些时间")
+    print("- 分析结果基于历史数据，不构成投资建议")
+    print("- 投资有风险，决策需谨慎")
 
     if console:
         # 显示模拟数据表格
@@ -96,10 +96,10 @@ def main():
         console.print("\n[bold green] 交互式菜单已创建！[/bold green]")
         console.print("[yellow] 使用方法:[/yellow]")
         console.print(
-            "  • 运行 '.venv/bin/python scripts/interactive_qsss.py' 使用完整交互式界面"
+            "  - 运行 '.venv/bin/python scripts/interactive_qsss.py' 使用完整交互式界面"
         )
-        console.print("• 运行 'qsss analyze' 使用传统命令行模式")
-        console.print("• 运行 'qsss' 启动交互式菜单 (需要修复数据源连接)")
+        console.print("- 运行 'qsss analyze' 使用传统命令行模式")
+        console.print("- 运行 'qsss' 启动交互式菜单 (需要修复数据源连接)")
 
         console.print("\n[bold cyan] 系统已就绪，开始您的量化投资之旅！[/bold cyan]")
     else:
@@ -115,10 +115,10 @@ def main():
         print("\n 交互式菜单已创建！")
         print(" 使用方法:")
         print(
-            "  • 运行 '.venv/bin/python scripts/interactive_qsss.py' 使用完整交互式界面"
+            "  - 运行 '.venv/bin/python scripts/interactive_qsss.py' 使用完整交互式界面"
         )
-        print("• 运行 'qsss analyze' 使用传统命令行模式")
-        print("• 运行 'qsss' 启动交互式菜单 (需要修复数据源连接)")
+        print("- 运行 'qsss analyze' 使用传统命令行模式")
+        print("- 运行 'qsss' 启动交互式菜单 (需要修复数据源连接)")
 
         print("\n 系统已就绪，开始您的量化投资之旅！")
 

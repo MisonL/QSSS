@@ -4,9 +4,6 @@ QSSS - 量化选股系统主程序
 兼容旧版本调用方式
 """
 
-import warnings
-warnings.filterwarnings('ignore')
-
 from src.qsss.core.strategy import QuantStrategy
 
 if __name__ == "__main__":

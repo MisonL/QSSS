@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """QSSS改进版交互式命令行界面"""
 
+import os
+import shutil
 import subprocess
+import sys
 import time
+from pathlib import Path
 
 try:
     from rich.console import Console
@@ -24,6 +28,20 @@ class ImprovedInteractiveCLI:
     def __init__(self):
         self.console = Console() if RICH_AVAILABLE else None
         self.last_results_file = None
+        self.project_root = Path(__file__).resolve().parents[1]
+        self.qsss_cmd = self._resolve_qsss_cmd()
+
+    def _resolve_qsss_cmd(self):
+        configured = os.environ.get("QSSS_BIN")
+        if configured:
+            return [configured]
+        local_bin = self.project_root / ".venv" / "bin" / "qsss"
+        if local_bin.exists():
+            return [str(local_bin)]
+        installed = shutil.which("qsss")
+        if installed:
+            return [installed]
+        return [sys.executable, "-m", "qsss.cli"]
 
     def print_banner(self):
         """显示欢迎横幅"""
@@ -101,13 +119,13 @@ class ImprovedInteractiveCLI:
 
                     # 运行qsss analyze命令
                     limit = 20  # 默认分析20只股票
-                    cmd = [".venv/bin/qsss", "analyze", "--limit", str(limit)]
+                    cmd = [*self.qsss_cmd, "analyze", "--limit", str(limit)]
 
                     progress.update(task, description="正在获取股票列表...")
 
             else:
                 limit = 20
-                cmd = [".venv/bin/qsss", "analyze", "--limit", str(limit)]
+                cmd = [*self.qsss_cmd, "analyze", "--limit", str(limit)]
 
             # 运行分析命令
             if console:
@@ -115,7 +133,7 @@ class ImprovedInteractiveCLI:
                 console.print(f"[cyan]开始分析 {limit} 只股票...[/cyan]")
 
             result = subprocess.run(
-                cmd, capture_output=True, text=True, cwd="/Volumes/Work/code/QSSS"
+                cmd, capture_output=True, text=True, cwd=str(self.project_root)
             )
 
             if result.returncode == 0:
@@ -171,9 +189,9 @@ class ImprovedInteractiveCLI:
                     "[yellow]提示: 请确保网络连接正常，数据源服务可用[/yellow]"
                 )
                 console.print("[cyan]您可以尝试:[/cyan]")
-                console.print("• 检查网络连接")
-                console.print("• 稍后再试")
-                console.print("• 使用传统命令: .venv/bin/qsss analyze")
+                console.print("- 检查网络连接")
+                console.print("- 稍后再试")
+                console.print("- 使用传统命令: qsss analyze")
             else:
                 print(f" 运行分析出错: {e}")
                 print("提示: 请确保网络连接正常，数据源服务可用")
@@ -198,10 +216,10 @@ class ImprovedInteractiveCLI:
 
         try:
             result = subprocess.run(
-                [".venv/bin/qsss", "config"],
+                [*self.qsss_cmd, "config"],
                 capture_output=True,
                 text=True,
-                cwd="/Volumes/Work/code/QSSS",
+                cwd=str(self.project_root),
             )
 
             if result.returncode == 0:
@@ -227,10 +245,10 @@ class ImprovedInteractiveCLI:
 [bold cyan]QSSS 量化选股系统 - 使用帮助[/bold cyan]
 
 [bold yellow]系统功能:[/bold yellow]
-• AI驱动选股 - 使用LightGBM机器学习模型预测5日上涨概率
-• 多因子评分 - 综合上涨概率、动量、爆发潜力、风险控制
-• 技术指标分析 - RSI、MACD、布林带、成交量综合分析
-• 智能筛选 - 自动识别优质标的和爆发潜力股
+- AI驱动选股 - 使用LightGBM机器学习模型预测5日上涨概率
+- 多因子评分 - 综合上涨概率、动量、爆发潜力、风险控制
+- 技术指标分析 - RSI、MACD、布林带、成交量综合分析
+- 智能筛选 - 自动识别优质标的和爆发潜力股
 
 [bold yellow]使用流程:[/bold yellow]
 1. 选择"运行选股分析"开始分析
@@ -239,10 +257,10 @@ class ImprovedInteractiveCLI:
 4. 可选择保存结果到CSV文件
 
 [bold yellow]结果说明:[/bold yellow]
-• [green]上涨概率[/green] - AI模型预测的未来5日上涨概率(0-1)
-• [yellow]动量得分[/yellow] - 综合1M/3M/6M动量指标(-1到1)
-• [red]爆发潜力[/red] - 超短线爆发可能性评分(0-3)
-• [blue]15日均线[/blue] - 技术面支撑位参考
+- [green]上涨概率[/green] - AI模型预测的未来5日上涨概率(0-1)
+- [yellow]动量得分[/yellow] - 综合1M/3M/6M动量指标(-1到1)
+- [red]爆发潜力[/red] - 超短线爆发可能性评分(0-3)
+- [blue]15日均线[/blue] - 技术面支撑位参考
 
 [bold yellow]注意事项:[/bold yellow]
  首次运行需要连接数据源，可能需要一些时间
@@ -250,9 +268,9 @@ class ImprovedInteractiveCLI:
  投资有风险，决策需谨慎
 
 [bold cyan]故障排除:[/bold cyan]
-• 如果连接失败，请检查网络连接
-• 部分股票数据可能不可用，这是正常现象
-• 系统会自动过滤无效数据并继续分析
+- 如果连接失败，请检查网络连接
+- 部分股票数据可能不可用，这是正常现象
+- 系统会自动过滤无效数据并继续分析
         """
 
         if console:

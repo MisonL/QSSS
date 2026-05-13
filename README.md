@@ -246,6 +246,17 @@ datasource_cooldown_seconds = 300  # 降级后的冷却时间（秒）
 
 > 可以使用 `qsss config` 查看当前生效的关键参数，使用 `qsss sources` 与 `scripts/analyze_logs.py` 联合排查数据源的降级 / 恢复情况。
 
+### 同花顺本地缓存编码
+
+同花顺本地板块成分文件仅作为只读辅助源，路径由 `QSSS_THS_CONCEPTION_PATH` 和
+`QSSS_THS_INDUSTRY_PATH` 指定。当前解析器要求 `block_conception.ini` 和
+`block_industry.ini` 使用 UTF-8 编码；若旧文件是 GBK/GB18030，请先转换后再配置：
+
+```bash
+iconv -f GBK -t UTF-8 block_conception.ini > block_conception.utf8.ini
+iconv -f GBK -t UTF-8 block_industry.ini > block_industry.utf8.ini
+```
+
 ## 性能优化
 
 ### 性能提升
@@ -344,4 +355,4 @@ docker logs -f qsss-app
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ---
-**⭐ 如果这个项目对您有帮助，请给个Star支持一下！**
+**如果这个项目对您有帮助，请给个Star支持一下！**

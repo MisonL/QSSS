@@ -11,7 +11,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - 安装核心依赖（CLI / 引擎）：
   - `uv pip install -r requirements.txt`
 - 安装完整开发依赖（包含测试、格式化、类型检查，来源于 `pyproject.toml`）：
-  - `pip install .[dev]`  
+  - `pip install .[dev]`
     （会安装 `pytest`、`pytest-cov`、`black`、`isort`、`flake8`、`mypy` 等工具）
 
 ### CLI / 核心引擎（core engine）

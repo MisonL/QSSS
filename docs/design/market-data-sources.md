@@ -247,9 +247,15 @@ iFinD 单元格预算建议:
 
 - 新增只读 parser。
 - 支持 `block_conception.ini` 和 `block_industry.ini`。
+- 文件必须为 UTF-8 编码；GBK/GB18030 旧缓存需先转换，例如：
+  `iconv -f GBK -t UTF-8 block_conception.ini > block_conception.utf8.ini`。
 - 不读取 WebKit 缓存、token、cookie。
 
 对应任务: `QSSS-004`
+
+变更记录:
+
+- 2026-05-13: 同花顺本地缓存解析改为严格 UTF-8。遇到非法字节会显式报错，不再静默跳过；升级前请转换旧 GBK/GB18030 文件。
 
 ### Phase 5: History provider and storage bridge
 
@@ -297,4 +303,3 @@ iFinD 单元格预算建议:
 - 若 Phase 3 AKShare 不稳定，不接管实时行情，只保留为板块/资金流 optional provider。
 - 若同花顺本地缓存路径不可用，不影响 pytdx、AKShare、BaoStock 主链。
 - 若 iFinD 预算不可计量，保持默认关闭。
-

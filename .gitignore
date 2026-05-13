@@ -20,6 +20,7 @@ env/
 
 # Runtime artifacts
 logs/
+instance/
 *.log
 *.tmp
 data/cache/

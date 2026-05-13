@@ -2,6 +2,7 @@
 """QSSS交互式命令行界面 - 完全独立版"""
 
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -27,6 +28,20 @@ class StandaloneInteractiveCLI:
     def __init__(self):
         self.console = Console() if RICH_AVAILABLE else None
         self.last_results_file = None
+        self.project_root = Path(__file__).resolve().parents[1]
+        self.qsss_cmd = self._resolve_qsss_cmd()
+
+    def _resolve_qsss_cmd(self):
+        configured = os.environ.get("QSSS_BIN")
+        if configured:
+            return [configured]
+        local_bin = self.project_root / ".venv" / "bin" / "qsss"
+        if local_bin.exists():
+            return [str(local_bin)]
+        installed = shutil.which("qsss")
+        if installed:
+            return [installed]
+        return [sys.executable, "-m", "qsss.cli"]
 
     def print_banner(self):
         """显示欢迎横幅"""
@@ -111,14 +126,14 @@ class StandaloneInteractiveCLI:
 
         try:
             # 使用原有的qsss analyze命令
-            cmd = [".venv/bin/qsss", "analyze", "--limit", str(limit)]
+            cmd = [*self.qsss_cmd, "analyze", "--limit", str(limit)]
             if filename:
                 cmd.extend(["--output", filename])
                 self.last_results_file = filename
 
             # 运行命令
             result = subprocess.run(
-                cmd, capture_output=True, text=True, cwd="/Volumes/Work/code/QSSS"
+                cmd, capture_output=True, text=True, cwd=str(self.project_root)
             )
 
             if result.returncode == 0:
@@ -211,10 +226,10 @@ class StandaloneInteractiveCLI:
         try:
             # 使用qsss config命令
             result = subprocess.run(
-                [".venv/bin/qsss", "config"],
+                [*self.qsss_cmd, "config"],
                 capture_output=True,
                 text=True,
-                cwd="/Volumes/Work/code/QSSS",
+                cwd=str(self.project_root),
             )
 
             if result.returncode == 0:
@@ -240,10 +255,10 @@ class StandaloneInteractiveCLI:
 QSSS 量化选股系统 - 使用帮助
 
 系统功能:
-• AI驱动选股 - 使用LightGBM机器学习模型预测5日上涨概率
-• 多因子评分 - 综合上涨概率、动量、爆发潜力、风险控制
-• 技术指标分析 - RSI、MACD、布林带、成交量综合分析
-• 智能筛选 - 自动识别优质标的和爆发潜力股
+- AI驱动选股 - 使用LightGBM机器学习模型预测5日上涨概率
+- 多因子评分 - 综合上涨概率、动量、爆发潜力、风险控制
+- 技术指标分析 - RSI、MACD、布林带、成交量综合分析
+- 智能筛选 - 自动识别优质标的和爆发潜力股
 
 使用流程:
 1. 选择"运行选股分析"开始分析
@@ -252,15 +267,15 @@ QSSS 量化选股系统 - 使用帮助
 4. 可选择保存结果到CSV文件
 
 结果说明:
-• 上涨概率: AI模型预测的未来5日上涨概率(0-1)
-• 动量得分: 综合1M/3M/6M动量指标(-1到1)
-• 爆发潜力: 超短线爆发可能性评分(0-3)
-• 15日均线: 技术面支撑位参考
+- 上涨概率: AI模型预测的未来5日上涨概率(0-1)
+- 动量得分: 综合1M/3M/6M动量指标(-1到1)
+- 爆发潜力: 超短线爆发可能性评分(0-3)
+- 15日均线: 技术面支撑位参考
 
 注意事项:
-• 首次运行需要连接数据源，可能需要一些时间
-• 分析结果基于历史数据，不构成投资建议
-• 投资有风险，决策需谨慎
+- 首次运行需要连接数据源，可能需要一些时间
+- 分析结果基于历史数据，不构成投资建议
+- 投资有风险，决策需谨慎
         """
 
         if self.console:

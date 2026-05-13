@@ -24,9 +24,6 @@ def cli(ctx: click.Context) -> None:
         # 无参数时启动简化交互式界面
         click.echo("正在启动QSSS交互式界面...")
         simple_interactive_main()
-    else:
-        # 有子命令时执行对应命令
-        pass
 
 
 @cli.command()
