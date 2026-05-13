@@ -15,7 +15,7 @@
 - **分布式处理**: Redis任务队列 + 多工作节点并行计算
 - **智能缓存**: L1内存缓存 + L2 Redis缓存，命中率80%+
 - **数据源健康监控**: 主备数据源自动降级 / 冷却机制，配合 CLI `qsss sources` 与日志分析脚本监控稳定性
-- **回测功能（规划中）**: 已预留回测模型与接口骨架，未来将支持历史数据策略验证和性能评估
+- **最小回测闭环**: Web 端已支持基于真实日线的买入持有基线回测，覆盖任务状态、结果落库与页面展示
 
 ## 技术架构
 
@@ -139,8 +139,8 @@ python web/run.py --env prod --host 0.0.0.0 --port 8080
 # 启动 Celery Worker（分布式任务）
 celery -A web.app.celery worker --loglevel=info
 ```
-# 访问 http://localhost:5000
-```
+
+访问 `http://localhost:5000`
 
 ### 分布式部署
 
