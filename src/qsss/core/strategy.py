@@ -1,5 +1,6 @@
 """核心策略类"""
 
+import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import Any, Callable, Dict, Optional
@@ -404,6 +405,55 @@ class QuantStrategy:
             logger.error(f"计算{symbol}15日均线失败: {e}")
             return None
 
+    def backtest(
+        self,
+        stock_data: pd.DataFrame,
+        strategy_type: str = "buy_hold",
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Run a minimal buy-and-hold backtest on real daily close data."""
+        params = parameters or {}
+        try:
+            initial_capital = float(params.get("initial_capital", 100000.0))
+        except (TypeError, ValueError):
+            return {"error": "initial_capital must be numeric"}
+        if initial_capital <= 0:
+            return {"error": "initial_capital must be positive"}
+
+        df = stock_data.copy()
+        if df.empty or "close" not in df.columns:
+            return {"error": "stock_data must include close prices"}
+
+        df["close"] = pd.to_numeric(df["close"], errors="coerce")
+        df = df.dropna(subset=["close"])
+        if len(df) < 2:
+            return {"error": "not enough data for backtest"}
+
+        close = df["close"].astype(float)
+        if (close <= 0).any():
+            return {"error": "close prices must be positive"}
+
+        returns = close.pct_change().dropna()
+        total_return = float(close.iloc[-1] / close.iloc[0] - 1)
+        periods = max(len(returns), 1)
+        annual_return = float((1 + total_return) ** (252 / periods) - 1)
+        equity = initial_capital * (close / close.iloc[0])
+
+        return {
+            "strategy_type": strategy_type,
+            "initial_capital": initial_capital,
+            "final_capital": float(equity.iloc[-1]),
+            "total_return": total_return,
+            "annual_return": annual_return,
+            "max_drawdown": _calculate_max_drawdown(equity),
+            "sharpe_ratio": _calculate_sharpe_ratio(returns),
+            "win_rate": float((returns > 0).mean()) if not returns.empty else 0.0,
+            "total_trades": 1,
+            "avg_hold_days": int(periods),
+            "max_profit": float(returns.max()) if not returns.empty else 0.0,
+            "max_loss": float(returns.min()) if not returns.empty else 0.0,
+        }
+
     def get_analysis_summary(self) -> Dict[str, Any]:
         """获取分析摘要"""
         return {
@@ -411,3 +461,18 @@ class QuantStrategy:
             "analysis_stats": self.analysis_stats,
             "cache_size": len(self.stock_data_cache),
         }
+
+
+def _calculate_max_drawdown(equity: pd.Series) -> float:
+    running_max = equity.cummax()
+    drawdown = (running_max - equity) / running_max.replace(0, pd.NA)
+    return float(drawdown.fillna(0).max())
+
+
+def _calculate_sharpe_ratio(returns: pd.Series) -> float:
+    if returns.empty:
+        return 0.0
+    std = float(returns.std())
+    if std <= 0 or math.isnan(std):
+        return 0.0
+    return float(returns.mean() / std * math.sqrt(252))

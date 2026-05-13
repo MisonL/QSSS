@@ -29,9 +29,7 @@ class _FakeStrategy:
         )
 
     def calculate_ma15(self, symbol, start_date="20220101"):
-        self.__class__.ma_calls.append(
-            {"symbol": symbol, "start_date": start_date}
-        )
+        self.__class__.ma_calls.append({"symbol": symbol, "start_date": start_date})
         return 9.5
 
 
@@ -48,6 +46,4 @@ def test_cli_analyze_passes_start_date_and_limit(monkeypatch):
 
     assert result.exit_code == 0
     assert _FakeStrategy.calls == [{"start_date": "20240101", "limit": 1}]
-    assert _FakeStrategy.ma_calls == [
-        {"symbol": "000001", "start_date": "20240101"}
-    ]
+    assert _FakeStrategy.ma_calls == [{"symbol": "000001", "start_date": "20240101"}]

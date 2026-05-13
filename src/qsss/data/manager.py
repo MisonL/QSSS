@@ -43,9 +43,7 @@ class DataManager:
         self.primary_source = settings.primary_data_source
         self.backup_source = settings.backup_data_source or None
         configured_sources = {
-            source
-            for source in [self.primary_source, self.backup_source]
-            if source
+            source for source in [self.primary_source, self.backup_source] if source
         }
 
         # 已注册的数据源适配器；键为数据源名称

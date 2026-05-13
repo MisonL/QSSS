@@ -6,7 +6,9 @@ from qsss.cache.manager import CacheDeserializationError, CacheManager
 from qsss.distributed.cache import (
     CacheDeserializationError as DistributedCacheDeserializationError,
 )
-from qsss.distributed.cache import DistributedCache
+from qsss.distributed.cache import (
+    DistributedCache,
+)
 
 
 class _BrokenRedis:

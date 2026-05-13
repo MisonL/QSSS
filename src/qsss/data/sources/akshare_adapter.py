@@ -258,7 +258,9 @@ def _normalize_board_list(raw_df: pd.DataFrame, board_type: str) -> pd.DataFrame
 
 def _normalize_board_flows(raw_df: pd.DataFrame, board_type: str) -> pd.DataFrame:
     name_col = _first_existing_column(raw_df, ["板块名称", "行业", "名称"], "板块名称")
-    code_col = next((col for col in ["板块代码", "代码"] if col in raw_df.columns), None)
+    code_col = next(
+        (col for col in ["板块代码", "代码"] if col in raw_df.columns), None
+    )
     result = pd.DataFrame(index=raw_df.index)
     result["board_name"] = raw_df[name_col].astype(str).str.strip()
     result["board_code"] = (

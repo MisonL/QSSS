@@ -7,9 +7,12 @@
 import copy
 
 import pandas as pd
+import pytest
 
 from qsss.config.settings import settings
 from qsss.core.strategy import QuantStrategy
+from qsss.models.ml_model import MLModel
+from qsss.strategies.technical import TechnicalAnalyzer
 
 
 def _make_base_row():
@@ -90,3 +93,88 @@ def test_apply_filters_rejects_rows_violating_each_condition():
 
     # 股价过低
     _check_rejected({"close": settings.min_price - 1e-3})
+
+
+def test_indicator_and_ml_feature_preparation_support_current_pandas():
+    """Feature preparation should avoid removed pandas fillna(method=...) API."""
+    df = pd.DataFrame(
+        {
+            "close": [10.0 + i * 0.1 for i in range(140)],
+            "volume": [100_000 + i * 100 for i in range(140)],
+            "turn": [1.0 for _ in range(140)],
+        }
+    )
+    df.loc[5, "close"] = None
+    df.loc[10, "volume"] = None
+
+    indicators = TechnicalAnalyzer.calculate_all_indicators(df)
+    features = MLModel().prepare_features(df)
+
+    assert not indicators.empty
+    assert not features.empty
+    assert indicators["rsi"].notna().all()
+    assert features[["momentum_1m", "volatility", "rsi", "macd"]].notna().all().all()
+
+
+def test_ml_training_ignores_unrelated_empty_columns():
+    """Training should not drop all rows because pytdx helper columns are empty."""
+    df = pd.DataFrame(
+        {
+            "close": [10.0 + i * 0.05 for i in range(180)],
+            "volume": [100_000 + i * 50 for i in range(180)],
+            "turn": [1.0 for _ in range(180)],
+            "hour": [None for _ in range(180)],
+            "minute": [None for _ in range(180)],
+        }
+    )
+
+    model, scaler = MLModel().train_model(df)
+
+    assert model is not None
+    assert scaler is not None
+
+
+def test_backtest_computes_buy_hold_metrics_from_close_prices():
+    strategy = QuantStrategy()
+    stock_data = pd.DataFrame({"close": [10.0, 11.0, 12.0]})
+
+    result = strategy.backtest(
+        stock_data,
+        strategy_type="buy_hold",
+        parameters={"initial_capital": 100000},
+    )
+
+    assert result["total_return"] == pytest.approx(0.2)
+    assert result["final_capital"] == 120000
+    assert result["total_trades"] == 1
+    assert result["max_drawdown"] == 0
+
+
+@pytest.mark.parametrize("invalid_price", [0.0, -1.0])
+def test_backtest_rejects_non_positive_close_prices(invalid_price):
+    strategy = QuantStrategy()
+    stock_data = pd.DataFrame({"close": [10.0, invalid_price, 12.0]})
+
+    result = strategy.backtest(stock_data)
+
+    assert result == {"error": "close prices must be positive"}
+
+
+@pytest.mark.parametrize(
+    ("initial_capital", "expected_error"),
+    [
+        (0, "initial_capital must be positive"),
+        (-1, "initial_capital must be positive"),
+        ("bad", "initial_capital must be numeric"),
+    ],
+)
+def test_backtest_rejects_invalid_initial_capital(initial_capital, expected_error):
+    strategy = QuantStrategy()
+    stock_data = pd.DataFrame({"close": [10.0, 12.0]})
+
+    result = strategy.backtest(
+        stock_data,
+        parameters={"initial_capital": initial_capital},
+    )
+
+    assert result == {"error": expected_error}

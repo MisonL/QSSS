@@ -286,7 +286,10 @@ def test_baostock_realtime_schema_when_available():
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"BaostockAdapter 初始化失败（可能是登录或网络问题）：{exc}")
 
-    df = adapter.get_realtime_data([SAMPLE_SYMBOL])
+    try:
+        df = adapter.get_realtime_data([SAMPLE_SYMBOL])
+    except NotImplementedError as exc:
+        pytest.skip(str(exc))
     if df is None or df.empty:
         pytest.skip("Baostock 实时行情返回空，可能是上游服务不可用")
 

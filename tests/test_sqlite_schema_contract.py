@@ -4,7 +4,6 @@ import sqlite3
 
 from qsss.database.schema import initialize_sqlite
 
-
 EXPECTED_TABLES = {
     "stocks",
     "bars_daily",

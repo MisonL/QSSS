@@ -1,8 +1,7 @@
 """机器学习模型模块"""
 
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
-import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -11,12 +10,22 @@ from sklearn.preprocessing import StandardScaler
 
 from ..config.settings import settings
 
+try:
+    import lightgbm as lgb
+
+    LIGHTGBM_AVAILABLE = True
+    LIGHTGBM_IMPORT_ERROR = ""
+except (ImportError, OSError) as exc:
+    lgb = None  # type: ignore[assignment]
+    LIGHTGBM_AVAILABLE = False
+    LIGHTGBM_IMPORT_ERROR = str(exc)
+
 
 class MLModel:
     """机器学习模型类"""
 
     def __init__(self) -> None:
-        self.model: Optional[lgb.LGBMClassifier] = None
+        self.model: Optional[Any] = None
         self.scaler: StandardScaler = StandardScaler()
         self.features = [
             "momentum_1m",
@@ -83,7 +92,7 @@ class MLModel:
             df["signal"] = df["macd"].ewm(span=9, adjust=False, min_periods=1).mean()
 
             # 填充缺失值
-            df = df.fillna(method="ffill").fillna(method="bfill")
+            df = df.ffill().bfill()
 
             return df
 
@@ -93,9 +102,13 @@ class MLModel:
 
     def train_model(
         self, df: pd.DataFrame
-    ) -> Tuple[Optional[lgb.LGBMClassifier], Optional[StandardScaler]]:
+    ) -> Tuple[Optional[Any], Optional[StandardScaler]]:
         """训练机器学习模型"""
         try:
+            if not LIGHTGBM_AVAILABLE or lgb is None:
+                logger.error(f"LightGBM 运行库不可用: {LIGHTGBM_IMPORT_ERROR}")
+                return None, None
+
             if len(df) < 100:  # 数据太少
                 logger.warning(f"数据量不足: {len(df)} < 100")
                 return None, None
@@ -108,8 +121,8 @@ class MLModel:
             # 创建目标变量（5日收益率）
             df["target"] = df["close"].shift(-5) / df["close"] - 1
 
-            # 删除缺失值
-            df = df.dropna()
+            # 只按训练所需列删除缺失值，避免非训练辅助列清空训练集。
+            df = df.dropna(subset=[*self.features, "target"])
             if len(df) < 50:  # 训练数据不足
                 return None, None
 
@@ -118,7 +131,11 @@ class MLModel:
             y = (df["target"] > df["target"].mean()).astype(int)
 
             # 数据标准化
-            X_scaled = self.scaler.fit_transform(X)
+            X_scaled = pd.DataFrame(
+                self.scaler.fit_transform(X),
+                columns=self.features,
+                index=X.index,
+            )
 
             # 分割训练集和测试集
             X_train, X_test, y_train, y_test = train_test_split(
@@ -155,9 +172,7 @@ class MLModel:
             logger.error(f"训练模型失败: {e}")
             return None, None
 
-    def predict(
-        self, df: pd.DataFrame, model: lgb.LGBMClassifier, scaler: StandardScaler
-    ) -> float:
+    def predict(self, df: pd.DataFrame, model: Any, scaler: StandardScaler) -> float:
         """预测上涨概率"""
         try:
             df = self.prepare_features(df)
@@ -169,7 +184,11 @@ class MLModel:
             if latest_data.isnull().any().any():
                 return 0.5
 
-            latest_scaled = scaler.transform(latest_data)
+            latest_scaled = pd.DataFrame(
+                scaler.transform(latest_data),
+                columns=self.features,
+                index=latest_data.index,
+            )
             prediction = model.predict_proba(latest_scaled)[0][1]
 
             return float(prediction)

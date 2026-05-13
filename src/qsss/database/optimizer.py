@@ -79,22 +79,16 @@ class DatabaseOptimizer:
         try:
             with self.app.app_context():
                 # 股票表索引
-                db.session.execute(
-                    text(
-                        """
+                db.session.execute(text("""
                     CREATE INDEX IF NOT EXISTS idx_stock_code ON stock(code);
                     CREATE INDEX IF NOT EXISTS idx_stock_market ON stock(market);
                     CREATE INDEX IF NOT EXISTS idx_stock_name ON stock(name);
                     CREATE INDEX IF NOT EXISTS idx_stock_created_at
                         ON stock(created_at);
-                """
-                    )
-                )
+                """))
 
                 # 分析结果表索引
-                db.session.execute(
-                    text(
-                        """
+                db.session.execute(text("""
                     CREATE INDEX IF NOT EXISTS idx_analysis_stock_id
                         ON analysis_result(stock_id);
                     CREATE INDEX IF NOT EXISTS idx_analysis_date
@@ -105,14 +99,10 @@ class DatabaseOptimizer:
                         ON analysis_result(strategy_type);
                     CREATE INDEX IF NOT EXISTS idx_analysis_stock_date
                         ON analysis_result(stock_id, analysis_date);
-                """
-                    )
-                )
+                """))
 
                 # 回测表索引
-                db.session.execute(
-                    text(
-                        """
+                db.session.execute(text("""
                     CREATE INDEX IF NOT EXISTS idx_backtest_stock_id
                         ON backtest(stock_id);
                     CREATE INDEX IF NOT EXISTS idx_backtest_strategy_id
@@ -123,9 +113,7 @@ class DatabaseOptimizer:
                         ON backtest(created_at);
                     CREATE INDEX IF NOT EXISTS idx_backtest_date_range
                         ON backtest(start_date, end_date);
-                """
-                    )
-                )
+                """))
 
                 db.session.commit()
                 logger.info("数据库索引创建完成")
@@ -160,8 +148,7 @@ class DatabaseOptimizer:
         with self.timed_query("get_stocks_with_analysis"):
             try:
                 # 使用单次查询获取所有数据
-                query = text(
-                    """
+                query = text("""
                     SELECT
                         s.id, s.code, s.name, s.market, s.created_at,
                         ar.analysis_date, ar.strategy_type, ar.prediction_score,
@@ -176,8 +163,7 @@ class DatabaseOptimizer:
                     )
                     ORDER BY s.code
                     LIMIT :limit OFFSET :offset
-                """
-                )
+                """)
 
                 result = db.session.execute(query, {"limit": limit, "offset": offset})
 
@@ -235,8 +221,7 @@ class DatabaseOptimizer:
 
         with self.timed_query("get_analysis_history"):
             try:
-                query = text(
-                    """
+                query = text("""
                     SELECT
                         analysis_date, strategy_type, prediction_score,
                         momentum_score, rsi, volatility, created_at
@@ -244,8 +229,7 @@ class DatabaseOptimizer:
                     WHERE stock_id = :stock_id
                     AND analysis_date >= DATE('now', '-' || :days || ' days')
                     ORDER BY analysis_date DESC
-                """
-                )
+                """)
 
                 result = db.session.execute(query, {"stock_id": stock_id, "days": days})
 
@@ -289,8 +273,7 @@ class DatabaseOptimizer:
         with self.timed_query("bulk_insert_analysis_results"):
             try:
                 # 使用批量插入
-                insert_query = text(
-                    """
+                insert_query = text("""
                     INSERT INTO analysis_result (
                         stock_id, analysis_date, strategy_type, prediction_score,
                         momentum_score, rsi, volatility, created_at
@@ -298,8 +281,7 @@ class DatabaseOptimizer:
                         :stock_id, :analysis_date, :strategy_type, :prediction_score,
                         :momentum_score, :rsi, :volatility, :created_at
                     )
-                """
-                )
+                """)
 
                 # 准备数据
                 insert_data = []
@@ -342,8 +324,7 @@ class DatabaseOptimizer:
 
         with self.timed_query("get_top_performing_stocks"):
             try:
-                query = text(
-                    """
+                query = text("""
                     SELECT
                         s.code, s.name, s.market,
                         AVG(ar.prediction_score) as avg_prediction,
@@ -358,8 +339,7 @@ class DatabaseOptimizer:
                     HAVING COUNT(ar.id) >= 3
                     ORDER BY avg_prediction DESC, avg_momentum DESC
                     LIMIT :limit
-                """
-                )
+                """)
 
                 result = db.session.execute(query, {"limit": limit, "days": days})
 
@@ -402,25 +382,17 @@ class DatabaseOptimizer:
                 logger.info("开始数据库清理和优化...")
 
                 # 清理过期的分析结果（保留90天）
-                deleted_count = db.session.execute(
-                    text(
-                        """
+                deleted_count = db.session.execute(text("""
                     DELETE FROM analysis_result
                     WHERE analysis_date < DATE('now', '-90 days')
-                """
-                    )
-                )
+                """))
 
                 # 清理过期的回测结果（保留180天）
-                deleted_backtests = db.session.execute(
-                    text(
-                        """
+                deleted_backtests = db.session.execute(text("""
                     DELETE FROM backtest
                     WHERE created_at < DATE('now', '-180 days')
                     AND status = 'completed'
-                """
-                    )
-                )
+                """))
 
                 db.session.commit()
 

@@ -90,9 +90,7 @@ class PerformanceMonitor:
         self.stats["total_time"] = end_time - self.start_time
 
         success_rate = (
-            self.stats["success_count"]
-            / max(1, self.stats["processed_stocks"])
-            * 100
+            self.stats["success_count"] / max(1, self.stats["processed_stocks"]) * 100
         )
         logger.info(
             f"性能统计 - 总耗时: {self.stats['total_time']:.0f}s, "

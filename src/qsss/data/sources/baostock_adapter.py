@@ -44,6 +44,14 @@ def _symbol_to_bs_code(symbol: str) -> str:
     return f"sz.{symbol}"
 
 
+def _normalize_bs_date(value: str) -> str:
+    """Normalize YYYYMMDD to the YYYY-MM-DD format expected by Baostock."""
+    value = str(value).strip()
+    if len(value) == 8 and value.isdigit():
+        return f"{value[:4]}-{value[4:6]}-{value[6:]}"
+    return value
+
+
 class BaostockAdapter(DataAdapter):
     """基于 Baostock 的数据源适配器。"""
 
@@ -86,9 +94,7 @@ class BaostockAdapter(DataAdapter):
         try:
             # Baostock 提供 stock_basic 接口，筛选在市 A 股
             self._throttle()
-            rs = bs.query_stock_basic(
-                code="", code_name="", org_id="", ipoDate="", outDate="", type="1"
-            )
+            rs = bs.query_stock_basic()
             if rs.error_code != "0":  # pragma: no cover
                 logger.error(f"baostock 获取股票列表失败: {rs.error_msg}")
                 return pd.DataFrame()
@@ -106,6 +112,8 @@ class BaostockAdapter(DataAdapter):
             # 只保留在市股票
             if "status" in df.columns:
                 df = df[df["status"] == "1"]
+            if "type" in df.columns:
+                df = df[df["type"] == "1"]
 
             # 拆分 code 为市场 + 代码
             def _split_code(code: str) -> tuple[str, str]:
@@ -161,6 +169,8 @@ class BaostockAdapter(DataAdapter):
             start_date = "2022-01-01"
         if not end_date:
             end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = _normalize_bs_date(start_date)
+        end_date = _normalize_bs_date(end_date)
 
         code = _symbol_to_bs_code(symbol)
 
@@ -195,6 +205,7 @@ class BaostockAdapter(DataAdapter):
                 "close",
                 "volume",
                 "amount",
+                "preclose",
                 "turn",
                 "pctChg",
             ]:
@@ -239,9 +250,8 @@ class BaostockAdapter(DataAdapter):
     # 实时数据（占位）
     # ------------------------------------------------------------------
     def get_realtime_data(self, symbols: List[str]) -> pd.DataFrame:
-        """获取实时数据。当前实现返回空 DataFrame。"""
-        logger.warning("BaostockAdapter.get_realtime_data 暂未实现，返回空 DataFrame")
-        return pd.DataFrame()
+        """Baostock does not provide a realtime quote endpoint."""
+        raise NotImplementedError("BaostockAdapter 不支持实时行情")
 
     def __del__(self) -> None:  # pragma: no cover
         if BAOSTOCK_IMPORTED and getattr(self, "_logged_in", False):

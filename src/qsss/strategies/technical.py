@@ -136,7 +136,7 @@ class TechnicalAnalyzer:
         df["vol_ratio"] = TechnicalAnalyzer.calculate_volume_ratio(df)
 
         # 填充缺失值
-        df = df.fillna(method="ffill").fillna(method="bfill")
+        df = df.ffill().bfill()
 
         return df
 

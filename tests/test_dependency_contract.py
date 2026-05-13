@@ -1,9 +1,8 @@
 """Dependency declaration contract tests."""
 
-from pathlib import Path
 import re
 import tomllib
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FREE_DATA_SOURCE_PACKAGES = {"pytdx", "akshare", "baostock"}

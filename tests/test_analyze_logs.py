@@ -21,14 +21,12 @@ from qsss.scripts.analyze_logs import (
 def _write_sample_log(tmp_path: Path) -> Path:
     """写入一个包含多数据源、多时间点事件的示例日志文件。"""
 
-    content = textwrap.dedent(
-        """
+    content = textwrap.dedent("""
         2025-01-01 09:00:00 | INFO | 数据源 pytdx 连续失败 ... 进入降级状态 ...
         2025-01-01 10:00:00 | INFO | 数据源 pytdx 已恢复正常 ...
         2025-01-01 11:30:00 | INFO | 数据源 tushare 连续失败 ... 进入降级状态 ...
         2025-01-02 09:15:00 | INFO | 数据源 pytdx 连续失败 ... 进入降级状态 ...
-        """
-    ).strip()
+        """).strip()
 
     log_file = tmp_path / "qsss_sample.log"
     log_file.write_text(content + "\n", encoding="utf-8")
